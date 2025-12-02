@@ -1,34 +1,9 @@
-﻿import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo, useEffect } from 'react';
 import { Database, User, Settings, AlertTriangle, Play, StopCircle, LogOut, CheckCircle, XCircle, Lock } from 'lucide-react';
 import { supabase } from './supabase';
 import AdminPanel from './AdminPanel';
 
-// --- VERİTABANI SİMÜLASYONU ---
-// Normalde bu veriler Supabase'den gelecek.
-const MOCK_OPERATORS = [
-  { id: 1, name: 'Ali Yılmaz', role: 'Operatör' },
-  { id: 2, name: 'Veli Demir', role: 'Operatör' },
-  { id: 3, name: 'Ayşe Kaya', role: 'Vardiya Amiri' },
-];
 
-const STOP_REASONS = [
-  'Makine Arızası',
-  'Hammadde Bekleme',
-  'Mola',
-  'Mesai Bitişi / Değişimi',
-  'Planlı Bakım',
-  'Diğer',
-];
-
-const ERROR_REASONS = [
-  'Kalite Problemi',
-  'Setup Hatası',
-  'Ekipman Eksiği',
-  'Hatalı Parametre',
-  'Personel Hatası',
-  'Diğer',
-];
-// --- VERİTABANI SİMÜLASYONU BİTİŞİ ---
 
 
 // --- Ana Uygulama Bileşeni ---
@@ -38,13 +13,57 @@ export default function App() {
   const [adminSession, setAdminSession] = useState(null);
 
   // Dinamik veri state'leri
-  const [operators, setOperators] = useState(MOCK_OPERATORS);
-  const [stopReasons, setStopReasons] = useState(STOP_REASONS);
-  const [errorReasons, setErrorReasons] = useState(ERROR_REASONS);
+  const [operators, setOperators] = useState([]);
+  const [stopReasons, setStopReasons] = useState([]);
+  const [errorReasons, setErrorReasons] = useState([]);
 
   // İYİLEŞTİRME: Makine durumunu (state) ana bileşene taşıdık.
   // Bu sayede çıkış yapıldığında durumu sıfırlayabiliriz.
   const [machineState, setMachineState] = useState('idle'); // 'idle', 'running', 'stopped'
+
+  // Fetch data from Supabase on mount
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Fetch operators
+        const { data: operatorsData, error: operatorsError } = await supabase
+          .from('operators')
+          .select('*')
+          .order('id');
+        if (!operatorsError && operatorsData) {
+          setOperators(operatorsData);
+        } else if (operatorsError) {
+          console.error('Error fetching operators:', operatorsError);
+        }
+
+        // Fetch stop reasons
+        const { data: stopReasonsData, error: stopReasonsError } = await supabase
+          .from('stop_reasons')
+          .select('*')
+          .order('id');
+        if (!stopReasonsError && stopReasonsData) {
+          setStopReasons(stopReasonsData.map(r => r.reason));
+        } else if (stopReasonsError) {
+          console.error('Error fetching stop reasons:', stopReasonsError);
+        }
+
+        // Fetch error reasons
+        const { data: errorReasonsData, error: errorReasonsError } = await supabase
+          .from('error_reasons')
+          .select('*')
+          .order('id');
+        if (!errorReasonsError && errorReasonsData) {
+          setErrorReasons(errorReasonsData.map(r => r.reason));
+        } else if (errorReasonsError) {
+          console.error('Error fetching error reasons:', errorReasonsError);
+        }
+      } catch (error) {
+        console.error('Unexpected error fetching data:', error);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   // Bu fonksiyon Supabase'e veri gönderecek
   const logEvent = async (type, reason) => {
