@@ -3,6 +3,8 @@ import { Database, User, Settings, AlertTriangle, Play, StopCircle, LogOut, Chec
 import { supabase } from './supabase';
 import AdminPanel from './AdminPanel';
 
+// Force rebuild - v2.0
+
 // --- VER─░TABANI S─░M├£LASYONU ---
 // Normalde bu veriler Supabase'den gelecek.
 const MOCK_OPERATORS = [
