@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 // icon'ları lucide-react kütüphanesinden import ediyoruz
-import { Database, User, Settings, AlertTriangle, Play, StopCircle, LogOut, CheckCircle, XCircle } from 'lucide-react';
+import { Database, User, Settings, AlertTriangle, Play, StopCircle, LogOut, CheckCircle, XCircle, Lock } from 'lucide-react';
 import { supabase } from './supabase';
 
 // --- VERİTABANI SİMÜLASYONU ---
@@ -33,27 +33,113 @@ const ERROR_REASONS = [
 
 // --- Ana Uygulama Bileşeni ---
 export default function App() {
-  const [currentPage, setCurrentPage] = useState('login'); // 'login', 'app', 'admin'
-  setCurrentPage('app');
-};
+  const [currentPage, setCurrentPage] = useState('login'); // 'login', 'app', 'admin', 'adminLogin'
+  const [currentUser, setCurrentUser] = useState(null);
+  const [adminSession, setAdminSession] = useState(null);
 
-// Çıkış yapıldığında
-const handleLogout = () => {
-  setCurrentUser(null);
-  setMachineState('idle'); // Makine durumunu sıfırla
-  setCurrentPage('login');
-};
+  // İYİLEŞTİRME: Makine durumunu (state) ana bileşene taşıdık.
+  // Bu sayede çıkış yapıldığında durumu sıfırlayabiliriz.
+  const [machineState, setMachineState] = useState('idle'); // 'idle', 'running', 'stopped'
 
-// Hangi ekranın gösterileceğini seçen kısım
-const renderPage = () => {
-  switch (currentPage) {
-    case 'app':
-      return (
-        <MainAppPanel
-          currentUser={currentUser}
-    </div >
-  </div >
-);
+  // Bu fonksiyon Supabase'e veri gönderecek
+  const logEvent = async (type, reason) => {
+    const timestamp = new Date().toISOString();
+    const logData = {
+      operator_id: currentUser.id,
+      operator_name: currentUser.name,
+      event_type: type, // 'START', 'STOP', 'ERROR'
+      event_reason: reason, // 'Mola', 'Kalite Problemi' etc.
+      timestamp: timestamp,
+    };
+
+    console.log('EVENT LOGGED TO DATABASE:', logData);
+
+    try {
+      const { error } = await supabase.from('logs').insert([logData]);
+      if (error) {
+        console.error('Supabase Hata:', error);
+        alert('Veri kaydedilirken hata oluştu: ' + error.message);
+      }
+    } catch (err) {
+      console.error('Beklenmeyen hata:', err);
+    }
+  };
+
+  // Operatör seçildiğinde
+  const handleOperatorLogin = (operator) => {
+    setCurrentUser(operator);
+    setCurrentPage('app');
+  };
+
+  // Çıkış yapıldığında
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setMachineState('idle'); // Makine durumunu sıfırla
+    setCurrentPage('login');
+  };
+
+  // Admin girişi
+  const handleAdminLoginRequest = () => {
+    setCurrentPage('adminLogin');
+  };
+
+  // Admin login handler
+  const handleAdminLogin = async (email, password) => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      alert('Giriş hatası: ' + error.message);
+      return false;
+    }
+
+    if (data.session) {
+      setAdminSession(data.session);
+      setCurrentPage('admin');
+      return true;
+    }
+    return false;
+  };
+
+  // Admin çıkış
+  const handleAdminLogout = async () => {
+    await supabase.auth.signOut();
+    setAdminSession(null);
+    setCurrentPage('login');
+  };
+
+  // Hangi ekranın gösterileceğini seçen kısım
+  const renderPage = () => {
+    switch (currentPage) {
+      case 'app':
+        return (
+          <MainAppPanel
+            currentUser={currentUser}
+            onLogout={handleLogout}
+            logEvent={logEvent}
+            machineState={machineState} // State'i prop olarak iletiyoruz
+            setMachineState={setMachineState} // State'i güncelleme fonksiyonunu iletiyoruz
+          />
+        );
+      case 'admin':
+        return <AdminPanel session={adminSession} onLogout={handleAdminLogout} />;
+      case 'adminLogin':
+        return <AdminLoginScreen onLogin={handleAdminLogin} onBack={() => setCurrentPage('login')} />;
+      case 'login':
+      default:
+        return <OperatorSelectScreen onSelectOperator={handleOperatorLogin} onGoToAdmin={handleAdminLoginRequest} />;
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        {renderPage()}
+      </div>
+    </div>
+  );
 }
 
 // --- 1. Ekran: Operatör Seçimi ---
@@ -210,23 +296,105 @@ function MainAppPanel({ currentUser, onLogout, logEvent, machineState, setMachin
   );
 }
 
-// --- 3. Ekran: Admin Paneli (Yer Tutucu) ---
-function AdminPanel({ onBack }) {
-  // Burası Supabase Auth ile korunacak ve operatör ekleme/çıkarma
-  // formlarını içerecek (daha sonraki adım)
+// --- 3. Ekran: Admin Login ---
+function AdminLoginScreen({ onLogin, onBack }) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    await onLogin(email, password);
+    setLoading(false);
+  };
+
   return (
-    <div className="bg-white p-8 rounded-2xl shadow-xl animate-fade-in text-center">
-      <h2 className="text-3xl font-bold text-gray-800 mb-6">Admin Paneli</h2>
-      <p className="text-lg text-gray-600 mb-8">
-        Bu alanda (Supabase Auth ile korunduktan sonra) operatör ekleyebilir,
-        çıkarabilir ve duruş/hata sebeplerini yönetebilirsiniz.
-      </p>
+    <div className="bg-white p-8 rounded-2xl shadow-xl animate-fade-in">
+      <div className="flex items-center justify-center mb-6">
+        <Lock size={40} className="text-blue-600" />
+      </div>
+      <h2 className="text-3xl font-bold text-center text-gray-800 mb-8">
+        Admin Girişi
+      </h2>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Email
+          </label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="admin@example.com"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Şifre
+          </label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="••••••••"
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full p-4 bg-blue-600 text-white rounded-lg text-lg font-medium hover:bg-blue-700 transition-all duration-200 disabled:opacity-50"
+        >
+          {loading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
+        </button>
+      </form>
       <button
         onClick={onBack}
-        className="w-full p-4 bg-blue-600 text-white rounded-lg text-lg font-medium hover:bg-blue-700 transition-all duration-200"
+        className="w-full mt-4 p-3 bg-gray-200 text-gray-700 rounded-lg text-md font-medium hover:bg-gray-300 transition-all duration-200"
       >
-        Giriş Ekranına Dön
+        Geri Dön
       </button>
+    </div>
+  );
+}
+
+// --- 4. Ekran: Admin Paneli ---
+function AdminPanel({ session, onLogout }) {
+  return (
+    <div className="bg-white p-8 rounded-2xl shadow-xl animate-fade-in">
+      <div className="flex justify-between items-center mb-6 pb-4 border-b border-gray-200">
+        <h2 className="text-3xl font-bold text-gray-800">Admin Paneli</h2>
+        <button
+          onClick={onLogout}
+          className="flex items-center gap-2 p-3 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-all duration-200"
+        >
+          <LogOut size={20} />
+          Çıkış Yap
+        </button>
+      </div>
+
+      <div className="text-center py-8">
+        <p className="text-lg text-gray-600 mb-4">
+          Hoş geldiniz! Giriş başarılı.
+        </p>
+        <p className="text-sm text-gray-500">
+          Email: {session?.user?.email}
+        </p>
+      </div>
+
+      <div className="mt-8 p-6 bg-blue-50 rounded-lg">
+        <h3 className="text-xl font-bold text-gray-800 mb-4">Gelecek Özellikler:</h3>
+        <ul className="list-disc list-inside text-gray-700 space-y-2">
+          <li>Operatör Ekleme/Çıkarma</li>
+          <li>Duruş ve Hata Sebeplerini Yönetme</li>
+          <li>Raporlar ve İstatistikler</li>
+          <li>Veri Görselleştirme</li>
+        </ul>
+      </div>
     </div>
   );
 }
