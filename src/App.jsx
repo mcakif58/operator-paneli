@@ -381,41 +381,6 @@ function AdminLoginScreen({ onLogin, onBack }) {
 }
 
 // --- 4. Ekran: Admin Paneli ---
-function AdminPanel({ session, onLogout }) {
-  return (
-    <div className="bg-white p-8 rounded-2xl shadow-xl animate-fade-in">
-      <div className="flex justify-between items-center mb-6 pb-4 border-b border-gray-200">
-        <h2 className="text-3xl font-bold text-gray-800">Admin Paneli</h2>
-        <button
-          onClick={onLogout}
-          className="flex items-center gap-2 p-3 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-all duration-200"
-        >
-          <LogOut size={20} />
-          ├ç─▒k─▒┼ş Yap
-        </button>
-      </div>
-
-      <div className="text-center py-8">
-        <p className="text-lg text-gray-600 mb-4">
-          Ho┼ş geldiniz! Giri┼ş ba┼şar─▒l─▒.
-        </p>
-        <p className="text-sm text-gray-500">
-          Email: {session?.user?.email}
-        </p>
-      </div>
-
-      <div className="mt-8 p-6 bg-blue-50 rounded-lg">
-        <h3 className="text-xl font-bold text-gray-800 mb-4">Gelecek ├ûzellikler:</h3>
-        <ul className="list-disc list-inside text-gray-700 space-y-2">
-          <li>Operat├Âr Ekleme/├ç─▒karma</li>
-          <li>Duru┼ş ve Hata Sebeplerini Y├Ânetme</li>
-          <li>Raporlar ve ─░statistikler</li>
-          <li>Veri G├Ârselle┼ştirme</li>
-        </ul>
-      </div>
-    </div>
-  );
-}
 
 
 // --- YARDIMCI B─░LE┼ŞENLER ---
