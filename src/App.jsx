@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 // icon'ları lucide-react kütüphanesinden import ediyoruz
 import { Database, User, Settings, AlertTriangle, Play, StopCircle, LogOut, CheckCircle, XCircle } from 'lucide-react';
+import { supabase } from './supabase';
 
 // --- VERİTABANI SİMÜLASYONU ---
 // Normalde bu veriler Supabase'den gelecek.
@@ -33,72 +34,26 @@ const ERROR_REASONS = [
 // --- Ana Uygulama Bileşeni ---
 export default function App() {
   const [currentPage, setCurrentPage] = useState('login'); // 'login', 'app', 'admin'
-  const [currentUser, setCurrentUser] = useState(null);
-  
-  // İYİLEŞTİRME: Makine durumunu (state) ana bileşene taşıdık.
-  // Bu sayede çıkış yapıldığında durumu sıfırlayabiliriz.
-  const [machineState, setMachineState] = useState('idle'); // 'idle', 'running', 'stopped'
-  
-  // Bu fonksiyon Supabase'e veri gönderecek (şimdilik konsola yazıyor)
-  const logEvent = (type, reason) => {
-    const timestamp = new Date().toISOString();
-    const logData = {
-      operator_id: currentUser.id,
-      operator_name: currentUser.name,
-      event_type: type, // 'START', 'STOP', 'ERROR'
-      event_reason: reason, // 'Mola', 'Kalite Problemi' etc.
-      timestamp: timestamp,
-    };
-    
-    console.log('EVENT LOGGED TO DATABASE:', logData);
-    //
-    // --- SUPABASE KODU BURAYA ---
-    // const { error } = await supabase.from('logs').insert([logData]);
-    // if (error) console.error('Supabase Hata:', error);
-    //
-  };
+  setCurrentPage('app');
+};
 
-  // Operatör seçildiğinde
-  const handleOperatorLogin = (operator) => {
-    setCurrentUser(operator);
-    setCurrentPage('app');
-  };
+// Çıkış yapıldığında
+const handleLogout = () => {
+  setCurrentUser(null);
+  setMachineState('idle'); // Makine durumunu sıfırla
+  setCurrentPage('login');
+};
 
-  // Çıkış yapıldığında
-  const handleLogout = () => {
-    setCurrentUser(null);
-    setMachineState('idle'); // Makine durumunu sıfırla
-    setCurrentPage('login');
-  };
-  
-  // Hangi ekranın gösterileceğini seçen kısım
-  const renderPage = () => {
-    switch (currentPage) {
-      case 'app':
-        return (
-          <MainAppPanel 
-            currentUser={currentUser} 
-            onLogout={handleLogout} 
-            logEvent={logEvent} 
-            machineState={machineState} // State'i prop olarak iletiyoruz
-            setMachineState={setMachineState} // State'i güncelleme fonksiyonunu iletiyoruz
-          />
-        );
-      case 'admin':
-        return <AdminPanel onBack={() => setCurrentPage('login')} />;
-      case 'login':
-      default:
-        return <OperatorSelectScreen onSelectOperator={handleOperatorLogin} onGoToAdmin={() => setCurrentPage('admin')} />;
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        {renderPage()}
-      </div>
-    </div>
-  );
+// Hangi ekranın gösterileceğini seçen kısım
+const renderPage = () => {
+  switch (currentPage) {
+    case 'app':
+      return (
+        <MainAppPanel
+          currentUser={currentUser}
+    </div >
+  </div >
+);
 }
 
 // --- 1. Ekran: Operatör Seçimi ---
@@ -136,7 +91,7 @@ function OperatorSelectScreen({ onSelectOperator, onGoToAdmin }) {
 // --- 2. Ekran: Ana Operatör Paneli ---
 // machineState ve setMachineState'i App bileşeninden prop olarak alıyoruz
 function MainAppPanel({ currentUser, onLogout, logEvent, machineState, setMachineState }) {
-  
+
   const [isStopModalOpen, setStopModalOpen] = useState(false);
   const [isErrorModalOpen, setErrorModalOpen] = useState(false);
 
@@ -150,7 +105,7 @@ function MainAppPanel({ currentUser, onLogout, logEvent, machineState, setMachin
   const handleStopClick = () => {
     setStopModalOpen(true);
   };
-  
+
   // Hata Kaydı Butonu (Modal'ı açar)
   const handleErrorClick = () => {
     setErrorModalOpen(true);
@@ -180,7 +135,7 @@ function MainAppPanel({ currentUser, onLogout, logEvent, machineState, setMachin
         return { text: 'BEKLEMEDE', icon: <Database size={24} />, color: 'bg-gray-200 text-gray-800' };
     }
   }, [machineState]);
-  
+
   return (
     <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-md animate-fade-in">
       {/* Üst Bilgi */}
@@ -215,7 +170,7 @@ function MainAppPanel({ currentUser, onLogout, logEvent, machineState, setMachin
             colorClass="bg-green-600 hover:bg-green-700"
           />
         )}
-        
+
         {/* Makine ÜRETİMDE ise */}
         {machineState === 'running' && (
           <>
@@ -243,7 +198,7 @@ function MainAppPanel({ currentUser, onLogout, logEvent, machineState, setMachin
         reasons={STOP_REASONS}
         onSelect={handleStopReasonSelect}
       />
-      
+
       <ReasonModal
         isOpen={isErrorModalOpen}
         onClose={() => setErrorModalOpen(false)}
