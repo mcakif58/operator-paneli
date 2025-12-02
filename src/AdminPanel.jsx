@@ -96,7 +96,7 @@ export default function AdminPanel({ session, onLogout, operators, setOperators,
                         className="flex items-center gap-2 px-4 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-all duration-200"
                     >
                         <LogOut size={18} />
-                        Ç\u0131k\u0131ş
+                        Çıkış Yap
                     </button>
                 </div>
             </div>
@@ -106,8 +106,8 @@ export default function AdminPanel({ session, onLogout, operators, setOperators,
                 <button
                     onClick={() => setActiveTab('operators')}
                     className={`px-6 py-3 font-semibold transition-all ${activeTab === 'operators'
-                            ? 'text-blue-600 border-b-2 border-blue-600'
-                            : 'text-gray-600 hover:text-gray-800'
+                        ? 'text-blue-600 border-b-2 border-blue-600'
+                        : 'text-gray-600 hover:text-gray-800'
                         }`}
                 >
                     Operatörler
@@ -124,8 +124,8 @@ export default function AdminPanel({ session, onLogout, operators, setOperators,
                 <button
                     onClick={() => setActiveTab('errorReasons')}
                     className={`px-6 py-3 font-semibold transition-all ${activeTab === 'errorReasons'
-                            ? 'text-blue-600 border-b-2 border-blue-600'
-                            : 'text-gray-600 hover:text-gray-800'
+                        ? 'text-blue-600 border-b-2 border-blue-600'
+                        : 'text-gray-600 hover:text-gray-800'
                         }`}
                 >
                     Hata Sebepleri
