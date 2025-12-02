@@ -34,6 +34,7 @@ const ERROR_REASONS = [
 // --- Ana Uygulama Bile┼şeni ---
 export default function App() {
   const [currentPage, setCurrentPage] = useState('login'); // 'login', 'app', 'admin', 'adminLogin'
+  const [currentUser, setCurrentUser] = useState(null);
   const [adminSession, setAdminSession] = useState(null);
 
   // Dinamik veri state'leri
