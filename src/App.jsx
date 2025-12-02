@@ -147,7 +147,7 @@ export default function App() {
         return <AdminLoginScreen onLogin={handleAdminLogin} onBack={() => setCurrentPage('login')} />;
       case 'login':
       default:
-        return <OperatorSelectScreen onSelectOperator={handleOperatorLogin} onGoToAdmin={handleAdminLoginRequest} />;
+        return <OperatorSelectScreen operators={operators} onSelectOperator={handleOperatorLogin} onGoToAdmin={handleAdminLoginRequest} />;
     }
   };
 
@@ -168,7 +168,7 @@ function OperatorSelectScreen({ onSelectOperator, onGoToAdmin }) {
         Operat├Âr Se├ğin
       </h2>
       <div className="grid grid-cols-1 gap-4">
-        {MOCK_OPERATORS.map((op) => (
+        {operators.map((op) => (
           <button
             key={op.id}
             onClick={() => onSelectOperator(op)}
