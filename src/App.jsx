@@ -3,37 +3,35 @@ import { Database, User, Settings, AlertTriangle, Play, StopCircle, LogOut, Chec
 import { supabase } from './supabase';
 import AdminPanel from './AdminPanel';
 
-// Force rebuild - v2.0
-
-// --- VER─░TABANI S─░M├£LASYONU ---
+// --- VERİTABANI SİMÜLASYONU ---
 // Normalde bu veriler Supabase'den gelecek.
 const MOCK_OPERATORS = [
-  { id: 1, name: 'Ali Y─▒lmaz', role: 'Operat├Âr' },
-  { id: 2, name: 'Veli Demir', role: 'Operat├Âr' },
-  { id: 3, name: 'Ay┼şe Kaya', role: 'Vardiya Amiri' },
+  { id: 1, name: 'Ali Yılmaz', role: 'Operatör' },
+  { id: 2, name: 'Veli Demir', role: 'Operatör' },
+  { id: 3, name: 'Ayşe Kaya', role: 'Vardiya Amiri' },
 ];
 
 const STOP_REASONS = [
-  'Makine Ar─▒zas─▒',
+  'Makine Arızası',
   'Hammadde Bekleme',
   'Mola',
-  'Mesai Biti┼şi / De─şi┼şimi',
-  'Planl─▒ Bak─▒m',
-  'Di─şer',
+  'Mesai Bitişi / Değişimi',
+  'Planlı Bakım',
+  'Diğer',
 ];
 
 const ERROR_REASONS = [
   'Kalite Problemi',
-  'Setup Hatas─▒',
-  'Ekipman Eksi─şi',
-  'Hatal─▒ Parametre',
-  'Personel Hatas─▒',
-  'Di─şer',
+  'Setup Hatası',
+  'Ekipman Eksiği',
+  'Hatalı Parametre',
+  'Personel Hatası',
+  'Diğer',
 ];
-// --- VER─░TABANI S─░M├£LASYONU B─░T─░┼Ş─░ ---
+// --- VERİTABANI SİMÜLASYONU BİTİŞİ ---
 
 
-// --- Ana Uygulama Bile┼şeni ---
+// --- Ana Uygulama Bileşeni ---
 export default function App() {
   const [currentPage, setCurrentPage] = useState('login'); // 'login', 'app', 'admin', 'adminLogin'
   const [currentUser, setCurrentUser] = useState(null);
@@ -44,11 +42,11 @@ export default function App() {
   const [stopReasons, setStopReasons] = useState(STOP_REASONS);
   const [errorReasons, setErrorReasons] = useState(ERROR_REASONS);
 
-  // ─░Y─░LE┼ŞT─░RME: Makine durumunu (state) ana bile┼şene ta┼ş─▒d─▒k.
-  // Bu sayede ├ğ─▒k─▒┼ş yap─▒ld─▒─ş─▒nda durumu s─▒f─▒rlayabiliriz.
+  // İYİLEŞTİRME: Makine durumunu (state) ana bileşene taşıdık.
+  // Bu sayede çıkış yapıldığında durumu sıfırlayabiliriz.
   const [machineState, setMachineState] = useState('idle'); // 'idle', 'running', 'stopped'
 
-  // Bu fonksiyon Supabase'e veri g├Ânderecek
+  // Bu fonksiyon Supabase'e veri gönderecek
   const logEvent = async (type, reason) => {
     const timestamp = new Date().toISOString();
     const logData = {
@@ -65,27 +63,27 @@ export default function App() {
       const { error } = await supabase.from('logs').insert([logData]);
       if (error) {
         console.error('Supabase Hata:', error);
-        alert('Veri kaydedilirken hata olu┼ştu: ' + error.message);
+        alert('Veri kaydedilirken hata oluştu: ' + error.message);
       }
     } catch (err) {
       console.error('Beklenmeyen hata:', err);
     }
   };
 
-  // Operat├Âr se├ğildi─şinde
+  // Operatör seçildiğinde
   const handleOperatorLogin = (operator) => {
     setCurrentUser(operator);
     setCurrentPage('app');
   };
 
-  // ├ç─▒k─▒┼ş yap─▒ld─▒─ş─▒nda
+  // Çıkış yapıldığında
   const handleLogout = () => {
     setCurrentUser(null);
-    setMachineState('idle'); // Makine durumunu s─▒f─▒rla
+    setMachineState('idle'); // Makine durumunu sıfırla
     setCurrentPage('login');
   };
 
-  // Admin giri┼şi
+  // Admin girişi
   const handleAdminLoginRequest = () => {
     setCurrentPage('adminLogin');
   };
@@ -98,7 +96,7 @@ export default function App() {
     });
 
     if (error) {
-      alert('Giri┼ş hatas─▒: ' + error.message);
+      alert('Giriş hatası: ' + error.message);
       return false;
     }
 
@@ -110,14 +108,14 @@ export default function App() {
     return false;
   };
 
-  // Admin ├ğ─▒k─▒┼ş
+  // Admin çıkış
   const handleAdminLogout = async () => {
     await supabase.auth.signOut();
     setAdminSession(null);
     setCurrentPage('login');
   };
 
-  // Hangi ekran─▒n g├Âsterilece─şini se├ğen k─▒s─▒m
+  // Hangi ekranın gösterileceğini seçen kısım
   const renderPage = () => {
     switch (currentPage) {
       case 'app':
@@ -126,8 +124,10 @@ export default function App() {
             currentUser={currentUser}
             onLogout={handleLogout}
             logEvent={logEvent}
-            machineState={machineState} // State'i prop olarak iletiyoruz
-            setMachineState={setMachineState} // State'i g├╝ncelleme fonksiyonunu iletiyoruz
+            machineState={machineState}
+            setMachineState={setMachineState}
+            stopReasons={stopReasons}
+            errorReasons={errorReasons}
           />
         );
       case 'admin':
@@ -160,12 +160,12 @@ export default function App() {
   );
 }
 
-// --- 1. Ekran: Operat├Âr Se├ğimi ---
-function OperatorSelectScreen({ onSelectOperator, onGoToAdmin }) {
+// --- 1. Ekran: Operatör Seçimi ---
+function OperatorSelectScreen({ operators, onSelectOperator, onGoToAdmin }) {
   return (
     <div className="bg-white p-6 rounded-2xl shadow-xl animate-fade-in">
       <h2 className="text-3xl font-bold text-center text-gray-800 mb-8">
-        Operat├Âr Se├ğin
+        Operatör Seçin
       </h2>
       <div className="grid grid-cols-1 gap-4">
         {operators.map((op) => (
@@ -192,37 +192,36 @@ function OperatorSelectScreen({ onSelectOperator, onGoToAdmin }) {
   );
 }
 
-// --- 2. Ekran: Ana Operat├Âr Paneli ---
-// machineState ve setMachineState'i App bile┼şeninden prop olarak al─▒yoruz
-function MainAppPanel({ currentUser, onLogout, logEvent, machineState, setMachineState }) {
+// --- 2. Ekran: Ana Operatör Paneli ---
+function MainAppPanel({ currentUser, onLogout, logEvent, machineState, setMachineState, stopReasons, errorReasons }) {
 
   const [isStopModalOpen, setStopModalOpen] = useState(false);
   const [isErrorModalOpen, setErrorModalOpen] = useState(false);
 
-  // ├£retimi Ba┼şlat
+  // Üretimi Başlat
   const handleStart = () => {
-    logEvent('START', '├£retim Ba┼şlat─▒ld─▒');
+    logEvent('START', 'Üretim Başlatıldı');
     setMachineState('running');
   };
 
-  // ├£retimi Durdur Butonu (Modal'─▒ a├ğar)
+  // Üretimi Durdur Butonu (Modal'ı açar)
   const handleStopClick = () => {
     setStopModalOpen(true);
   };
 
-  // Hata Kayd─▒ Butonu (Modal'─▒ a├ğar)
+  // Hata Kaydı Butonu (Modal'ı açar)
   const handleErrorClick = () => {
     setErrorModalOpen(true);
   };
 
-  // Duru┼ş Sebebi Modal'─▒ndan se├ğim yap─▒ld─▒─ş─▒nda
+  // Duruş Sebebi Modal'ından seçim yapıldığında
   const handleStopReasonSelect = (reason) => {
     logEvent('STOP', reason);
     setMachineState('stopped'); // veya 'idle'
     setStopModalOpen(false);
   };
 
-  // Hata Sebebi Modal'─▒ndan se├ğim yap─▒ld─▒─ş─▒nda
+  // Hata Sebebi Modal'ından seçim yapıldığında
   const handleErrorReasonSelect = (reason) => {
     logEvent('ERROR', reason);
     setErrorModalOpen(false);
@@ -231,9 +230,9 @@ function MainAppPanel({ currentUser, onLogout, logEvent, machineState, setMachin
   const statusConfig = useMemo(() => {
     switch (machineState) {
       case 'running':
-        return { text: '├£RET─░MDE', icon: <CheckCircle size={24} />, color: 'bg-green-100 text-green-800' };
+        return { text: 'ÜRETİMDE', icon: <CheckCircle size={24} />, color: 'bg-green-100 text-green-800' };
       case 'stopped':
-        return { text: 'DURU┼ŞTA', icon: <XCircle size={24} />, color: 'bg-red-100 text-red-800' };
+        return { text: 'DURUŞTA', icon: <XCircle size={24} />, color: 'bg-red-100 text-red-800' };
       case 'idle':
       default:
         return { text: 'BEKLEMEDE', icon: <Database size={24} />, color: 'bg-gray-200 text-gray-800' };
@@ -242,50 +241,50 @@ function MainAppPanel({ currentUser, onLogout, logEvent, machineState, setMachin
 
   return (
     <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-md animate-fade-in">
-      {/* ├£st Bilgi */}
+      {/* Üst Bilgi */}
       <div className="flex justify-between items-center mb-6 pb-4 border-b border-gray-200">
         <div>
-          <span className="text-sm text-gray-500">Aktif Operat├Âr</span>
+          <span className="text-sm text-gray-500">Aktif Operatör</span>
           <h3 className="text-xl font-bold text-gray-900">{currentUser.name}</h3>
         </div>
         <button
-          onClick={onLogout} // Art─▒k App'ten gelen ana ├ğ─▒k─▒┼ş fonksiyonunu ├ğa─ş─▒r─▒yoruz
+          onClick={onLogout} // Artık App'ten gelen ana çıkış fonksiyonunu çağırıyoruz
           className="p-3 bg-gray-100 rounded-full text-gray-600 hover:bg-red-100 hover:text-red-600 transition-all duration-200"
-          title="Operat├Âr De─şi┼ştir"
+          title="Operatör Değiştir"
         >
           <LogOut size={20} />
         </button>
       </div>
 
-      {/* Durum G├Âstergesi */}
+      {/* Durum Göstergesi */}
       <div className={`flex items-center justify-center gap-3 p-4 rounded-lg mb-8 text-2xl font-bold ${statusConfig.color}`}>
         {statusConfig.icon}
         {statusConfig.text}
       </div>
 
-      {/* Ana Eylem Butonlar─▒ */}
+      {/* Ana Eylem Butonları */}
       <div className="space-y-6">
-        {/* Makine BEKLEMEDE veya DURU┼ŞTA ise */}
+        {/* Makine BEKLEMEDE veya DURUŞTA ise */}
         {(machineState === 'idle' || machineState === 'stopped') && (
           <ActionButton
-            text="├£retimi Ba┼şlat"
+            text="Üretimi Başlat"
             onClick={handleStart}
             icon={<Play size={40} />}
             colorClass="bg-green-600 hover:bg-green-700"
           />
         )}
 
-        {/* Makine ├£RET─░MDE ise */}
+        {/* Makine ÜRETİMDE ise */}
         {machineState === 'running' && (
           <>
             <ActionButton
-              text="├£retimi Durdur"
+              text="Üretimi Durdur"
               onClick={handleStopClick}
               icon={<StopCircle size={40} />}
               colorClass="bg-red-600 hover:bg-red-700"
             />
             <ActionButton
-              text="Hata Kayd─▒"
+              text="Hata Kaydı"
               onClick={handleErrorClick}
               icon={<AlertTriangle size={40} />}
               colorClass="bg-yellow-500 hover:bg-yellow-600"
@@ -294,12 +293,12 @@ function MainAppPanel({ currentUser, onLogout, logEvent, machineState, setMachin
         )}
       </div>
 
-      {/* Modallar (A├ğ─▒l─▒r Pencereler) */}
+      {/* Modallar (Açılır Pencereler) */}
       <ReasonModal
         isOpen={isStopModalOpen}
         onClose={() => setStopModalOpen(false)}
-        title="Duru┼ş Sebebi Nedir?"
-        reasons={STOP_REASONS}
+        title="Duruş Sebebi Nedir?"
+        reasons={stopReasons}
         onSelect={handleStopReasonSelect}
       />
 
@@ -307,7 +306,7 @@ function MainAppPanel({ currentUser, onLogout, logEvent, machineState, setMachin
         isOpen={isErrorModalOpen}
         onClose={() => setErrorModalOpen(false)}
         title="Hata Sebebi Nedir?"
-        reasons={ERROR_REASONS}
+        reasons={errorReasons}
         onSelect={handleErrorReasonSelect}
       />
     </div>
@@ -333,7 +332,7 @@ function AdminLoginScreen({ onLogin, onBack }) {
         <Lock size={40} className="text-blue-600" />
       </div>
       <h2 className="text-3xl font-bold text-center text-gray-800 mb-8">
-        Admin Giri┼şi
+        Admin Girişi
       </h2>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
@@ -351,7 +350,7 @@ function AdminLoginScreen({ onLogin, onBack }) {
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            ┼Şifre
+            Şifre
           </label>
           <input
             type="password"
@@ -359,7 +358,7 @@ function AdminLoginScreen({ onLogin, onBack }) {
             onChange={(e) => setPassword(e.target.value)}
             required
             className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="ÔÇóÔÇóÔÇóÔÇóÔÇóÔÇóÔÇóÔÇó"
+            placeholder="••••••••"
           />
         </div>
         <button
@@ -367,51 +366,51 @@ function AdminLoginScreen({ onLogin, onBack }) {
           disabled={loading}
           className="w-full p-4 bg-blue-600 text-white rounded-lg text-lg font-medium hover:bg-blue-700 transition-all duration-200 disabled:opacity-50"
         >
-          {loading ? 'Giri┼ş yap─▒l─▒yor...' : 'Giri┼ş Yap'}
+          {loading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
         </button>
       </form>
       <button
         onClick={onBack}
         className="w-full mt-4 p-3 bg-gray-200 text-gray-700 rounded-lg text-md font-medium hover:bg-gray-300 transition-all duration-200"
       >
-        Geri D├Ân
+        Geri Dön
       </button>
     </div>
   );
 }
 
-// --- 4. Ekran: Admin Paneli ---
 
+// --- YARDIMCI BİLEŞENLER ---
 
-// --- YARDIMCI B─░LE┼ŞENLER ---
-
-// B├╝y├╝k Ana Eylem Butonu
+// Büyük Ana Eylem Butonu
 function ActionButton({ text, onClick, icon, colorClass }) {
   return (
     <button
       onClick={onClick}
-      className={`flex flex-col items-center justify-center text-white w-full h-40 rounded-xl shadow-lg transform transition-all duration-200 hover:scale-105 ${colorClass}`}
+      className={`w-full flex items-center justify-between p-6 rounded-xl text-white shadow-lg transform transition-all duration-200 hover:scale-105 active:scale-95 ${colorClass}`}
     >
+      <span className="text-2xl font-bold">{text}</span>
       {icon}
-      <span className="text-3xl font-bold mt-2">{text}</span>
     </button>
   );
 }
 
-// Sebep Se├ğim Modal─▒ (Duru┼ş ve Hata i├ğin)
+// Sebep Seçim Modalı (Duruş ve Hata için)
 function ReasonModal({ isOpen, onClose, title, reasons, onSelect }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 animate-fade-in-fast z-50">
-      <div className="bg-white rounded-2xl p-8 w-full max-w-lg shadow-xl">
-        <h3 className="text-2xl font-bold text-gray-900 mb-6 text-center">{title}</h3>
-        <div className="grid grid-cols-2 gap-4">
-          {reasons.map((reason) => (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-fade-in">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
+        <h3 className="text-2xl font-bold text-gray-800 mb-6 text-center border-b pb-4">
+          {title}
+        </h3>
+        <div className="grid grid-cols-1 gap-3 max-h-[60vh] overflow-y-auto">
+          {reasons.map((reason, index) => (
             <button
-              key={reason}
+              key={index}
               onClick={() => onSelect(reason)}
-              className="p-5 bg-gray-100 text-gray-800 rounded-lg text-lg font-medium text-center hover:bg-blue-100 hover:text-blue-700 transition-all duration-150"
+              className="p-4 text-left bg-gray-50 hover:bg-blue-50 border border-gray-200 rounded-lg text-lg font-medium text-gray-700 hover:text-blue-700 transition-colors duration-150"
             >
               {reason}
             </button>
@@ -421,7 +420,7 @@ function ReasonModal({ isOpen, onClose, title, reasons, onSelect }) {
           onClick={onClose}
           className="w-full mt-6 p-4 bg-gray-700 text-white rounded-lg text-lg font-medium hover:bg-gray-800 transition-all duration-200"
         >
-          ─░ptal
+          İptal
         </button>
       </div>
     </div>
