@@ -28,7 +28,20 @@ export default function AdminPanel({ session, onLogout, operators, setOperators,
     };
 
     const addOperator = async (name, role) => {
-        const { data, error } = await supabase.from('operators').insert([{ name, role }]).select();
+        // Get current user for RLS
+        const { data: { user } } = await supabase.auth.getUser();
+
+        if (!user) {
+            alert('Oturum hatası: Kullanıcı bulunamadı.');
+            return false;
+        }
+
+        const { data, error } = await supabase.from('operators').insert([{
+            name,
+            role,
+            user_id: user.id
+        }]).select();
+
         if (!error && data) {
             setOperators([...operators, data[0]]);
             return true;
