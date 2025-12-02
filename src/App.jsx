@@ -265,7 +265,7 @@ function AdminPanel({ onBack }) {
       <p className="text-lg text-gray-600 mb-8">
         Bu alanda (Supabase Auth ile korunduktan sonra) operatör ekleyebilir,
         çıkarabilir ve duruş/hata sebeplerini yönetebilirsiniz.
-      </FÇp>
+      </p>
       <button
         onClick={onBack}
         className="w-full p-4 bg-blue-600 text-white rounded-lg text-lg font-medium hover:bg-blue-700 transition-all duration-200"
