@@ -1,10 +1,168 @@
+﻿import React, { useState, useMemo } from 'react';
+import { Database, User, Settings, AlertTriangle, Play, StopCircle, LogOut, CheckCircle, XCircle, Lock } from 'lucide-react';
+import { supabase } from './supabase';
+import AdminPanel from './AdminPanel';
 
-// --- 1. Ekran: Operatör Seçimi ---
+// --- VER─░TABANI S─░M├£LASYONU ---
+// Normalde bu veriler Supabase'den gelecek.
+const MOCK_OPERATORS = [
+  { id: 1, name: 'Ali Y─▒lmaz', role: 'Operat├Âr' },
+  { id: 2, name: 'Veli Demir', role: 'Operat├Âr' },
+  { id: 3, name: 'Ay┼şe Kaya', role: 'Vardiya Amiri' },
+];
+
+const STOP_REASONS = [
+  'Makine Ar─▒zas─▒',
+  'Hammadde Bekleme',
+  'Mola',
+  'Mesai Biti┼şi / De─şi┼şimi',
+  'Planl─▒ Bak─▒m',
+  'Di─şer',
+];
+
+const ERROR_REASONS = [
+  'Kalite Problemi',
+  'Setup Hatas─▒',
+  'Ekipman Eksi─şi',
+  'Hatal─▒ Parametre',
+  'Personel Hatas─▒',
+  'Di─şer',
+];
+// --- VER─░TABANI S─░M├£LASYONU B─░T─░┼Ş─░ ---
+
+
+// --- Ana Uygulama Bile┼şeni ---
+export default function App() {
+  const [currentPage, setCurrentPage] = useState('login'); // 'login', 'app', 'admin', 'adminLogin'
+  const [adminSession, setAdminSession] = useState(null);
+
+  // Dinamik veri state'leri
+  const [operators, setOperators] = useState(MOCK_OPERATORS);
+  const [stopReasons, setStopReasons] = useState(STOP_REASONS);
+  const [errorReasons, setErrorReasons] = useState(ERROR_REASONS);
+
+  // ─░Y─░LE┼ŞT─░RME: Makine durumunu (state) ana bile┼şene ta┼ş─▒d─▒k.
+  // Bu sayede ├ğ─▒k─▒┼ş yap─▒ld─▒─ş─▒nda durumu s─▒f─▒rlayabiliriz.
+  const [machineState, setMachineState] = useState('idle'); // 'idle', 'running', 'stopped'
+
+  // Bu fonksiyon Supabase'e veri g├Ânderecek
+  const logEvent = async (type, reason) => {
+    const timestamp = new Date().toISOString();
+    const logData = {
+      operator_id: currentUser.id,
+      operator_name: currentUser.name,
+      event_type: type, // 'START', 'STOP', 'ERROR'
+      event_reason: reason, // 'Mola', 'Kalite Problemi' etc.
+      timestamp: timestamp,
+    };
+
+    console.log('EVENT LOGGED TO DATABASE:', logData);
+
+    try {
+      const { error } = await supabase.from('logs').insert([logData]);
+      if (error) {
+        console.error('Supabase Hata:', error);
+        alert('Veri kaydedilirken hata olu┼ştu: ' + error.message);
+      }
+    } catch (err) {
+      console.error('Beklenmeyen hata:', err);
+    }
+  };
+
+  // Operat├Âr se├ğildi─şinde
+  const handleOperatorLogin = (operator) => {
+    setCurrentUser(operator);
+    setCurrentPage('app');
+  };
+
+  // ├ç─▒k─▒┼ş yap─▒ld─▒─ş─▒nda
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setMachineState('idle'); // Makine durumunu s─▒f─▒rla
+    setCurrentPage('login');
+  };
+
+  // Admin giri┼şi
+  const handleAdminLoginRequest = () => {
+    setCurrentPage('adminLogin');
+  };
+
+  // Admin login handler
+  const handleAdminLogin = async (email, password) => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      alert('Giri┼ş hatas─▒: ' + error.message);
+      return false;
+    }
+
+    if (data.session) {
+      setAdminSession(data.session);
+      setCurrentPage('admin');
+      return true;
+    }
+    return false;
+  };
+
+  // Admin ├ğ─▒k─▒┼ş
+  const handleAdminLogout = async () => {
+    await supabase.auth.signOut();
+    setAdminSession(null);
+    setCurrentPage('login');
+  };
+
+  // Hangi ekran─▒n g├Âsterilece─şini se├ğen k─▒s─▒m
+  const renderPage = () => {
+    switch (currentPage) {
+      case 'app':
+        return (
+          <MainAppPanel
+            currentUser={currentUser}
+            onLogout={handleLogout}
+            logEvent={logEvent}
+            machineState={machineState} // State'i prop olarak iletiyoruz
+            setMachineState={setMachineState} // State'i g├╝ncelleme fonksiyonunu iletiyoruz
+          />
+        );
+      case 'admin':
+        return (
+          <AdminPanel
+            session={adminSession}
+            onLogout={handleAdminLogout}
+            operators={operators}
+            setOperators={setOperators}
+            stopReasons={stopReasons}
+            setStopReasons={setStopReasons}
+            errorReasons={errorReasons}
+            setErrorReasons={setErrorReasons}
+          />
+        );
+      case 'adminLogin':
+        return <AdminLoginScreen onLogin={handleAdminLogin} onBack={() => setCurrentPage('login')} />;
+      case 'login':
+      default:
+        return <OperatorSelectScreen onSelectOperator={handleOperatorLogin} onGoToAdmin={handleAdminLoginRequest} />;
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+      <div className="w-full max-w-4xl">
+        {renderPage()}
+      </div>
+    </div>
+  );
+}
+
+// --- 1. Ekran: Operat├Âr Se├ğimi ---
 function OperatorSelectScreen({ onSelectOperator, onGoToAdmin }) {
   return (
     <div className="bg-white p-6 rounded-2xl shadow-xl animate-fade-in">
       <h2 className="text-3xl font-bold text-center text-gray-800 mb-8">
-        Operatör Seçin
+        Operat├Âr Se├ğin
       </h2>
       <div className="grid grid-cols-1 gap-4">
         {MOCK_OPERATORS.map((op) => (
@@ -31,37 +189,37 @@ function OperatorSelectScreen({ onSelectOperator, onGoToAdmin }) {
   );
 }
 
-// --- 2. Ekran: Ana Operatör Paneli ---
-// machineState ve setMachineState'i App bileşeninden prop olarak alıyoruz
+// --- 2. Ekran: Ana Operat├Âr Paneli ---
+// machineState ve setMachineState'i App bile┼şeninden prop olarak al─▒yoruz
 function MainAppPanel({ currentUser, onLogout, logEvent, machineState, setMachineState }) {
 
   const [isStopModalOpen, setStopModalOpen] = useState(false);
   const [isErrorModalOpen, setErrorModalOpen] = useState(false);
 
-  // Üretimi Başlat
+  // ├£retimi Ba┼şlat
   const handleStart = () => {
-    logEvent('START', 'Üretim Başlatıldı');
+    logEvent('START', '├£retim Ba┼şlat─▒ld─▒');
     setMachineState('running');
   };
 
-  // Üretimi Durdur Butonu (Modal'ı açar)
+  // ├£retimi Durdur Butonu (Modal'─▒ a├ğar)
   const handleStopClick = () => {
     setStopModalOpen(true);
   };
 
-  // Hata Kaydı Butonu (Modal'ı açar)
+  // Hata Kayd─▒ Butonu (Modal'─▒ a├ğar)
   const handleErrorClick = () => {
     setErrorModalOpen(true);
   };
 
-  // Duruş Sebebi Modal'ından seçim yapıldığında
+  // Duru┼ş Sebebi Modal'─▒ndan se├ğim yap─▒ld─▒─ş─▒nda
   const handleStopReasonSelect = (reason) => {
     logEvent('STOP', reason);
     setMachineState('stopped'); // veya 'idle'
     setStopModalOpen(false);
   };
 
-  // Hata Sebebi Modal'ından seçim yapıldığında
+  // Hata Sebebi Modal'─▒ndan se├ğim yap─▒ld─▒─ş─▒nda
   const handleErrorReasonSelect = (reason) => {
     logEvent('ERROR', reason);
     setErrorModalOpen(false);
@@ -70,9 +228,9 @@ function MainAppPanel({ currentUser, onLogout, logEvent, machineState, setMachin
   const statusConfig = useMemo(() => {
     switch (machineState) {
       case 'running':
-        return { text: 'ÜRETİMDE', icon: <CheckCircle size={24} />, color: 'bg-green-100 text-green-800' };
+        return { text: '├£RET─░MDE', icon: <CheckCircle size={24} />, color: 'bg-green-100 text-green-800' };
       case 'stopped':
-        return { text: 'DURUŞTA', icon: <XCircle size={24} />, color: 'bg-red-100 text-red-800' };
+        return { text: 'DURU┼ŞTA', icon: <XCircle size={24} />, color: 'bg-red-100 text-red-800' };
       case 'idle':
       default:
         return { text: 'BEKLEMEDE', icon: <Database size={24} />, color: 'bg-gray-200 text-gray-800' };
@@ -81,50 +239,50 @@ function MainAppPanel({ currentUser, onLogout, logEvent, machineState, setMachin
 
   return (
     <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-md animate-fade-in">
-      {/* Üst Bilgi */}
+      {/* ├£st Bilgi */}
       <div className="flex justify-between items-center mb-6 pb-4 border-b border-gray-200">
         <div>
-          <span className="text-sm text-gray-500">Aktif Operatör</span>
+          <span className="text-sm text-gray-500">Aktif Operat├Âr</span>
           <h3 className="text-xl font-bold text-gray-900">{currentUser.name}</h3>
         </div>
         <button
-          onClick={onLogout} // Artık App'ten gelen ana çıkış fonksiyonunu çağırıyoruz
+          onClick={onLogout} // Art─▒k App'ten gelen ana ├ğ─▒k─▒┼ş fonksiyonunu ├ğa─ş─▒r─▒yoruz
           className="p-3 bg-gray-100 rounded-full text-gray-600 hover:bg-red-100 hover:text-red-600 transition-all duration-200"
-          title="Operatör Değiştir"
+          title="Operat├Âr De─şi┼ştir"
         >
           <LogOut size={20} />
         </button>
       </div>
 
-      {/* Durum Göstergesi */}
+      {/* Durum G├Âstergesi */}
       <div className={`flex items-center justify-center gap-3 p-4 rounded-lg mb-8 text-2xl font-bold ${statusConfig.color}`}>
         {statusConfig.icon}
         {statusConfig.text}
       </div>
 
-      {/* Ana Eylem Butonları */}
+      {/* Ana Eylem Butonlar─▒ */}
       <div className="space-y-6">
-        {/* Makine BEKLEMEDE veya DURUŞTA ise */}
+        {/* Makine BEKLEMEDE veya DURU┼ŞTA ise */}
         {(machineState === 'idle' || machineState === 'stopped') && (
           <ActionButton
-            text="Üretimi Başlat"
+            text="├£retimi Ba┼şlat"
             onClick={handleStart}
             icon={<Play size={40} />}
             colorClass="bg-green-600 hover:bg-green-700"
           />
         )}
 
-        {/* Makine ÜRETİMDE ise */}
+        {/* Makine ├£RET─░MDE ise */}
         {machineState === 'running' && (
           <>
             <ActionButton
-              text="Üretimi Durdur"
+              text="├£retimi Durdur"
               onClick={handleStopClick}
               icon={<StopCircle size={40} />}
               colorClass="bg-red-600 hover:bg-red-700"
             />
             <ActionButton
-              text="Hata Kaydı"
+              text="Hata Kayd─▒"
               onClick={handleErrorClick}
               icon={<AlertTriangle size={40} />}
               colorClass="bg-yellow-500 hover:bg-yellow-600"
@@ -133,11 +291,11 @@ function MainAppPanel({ currentUser, onLogout, logEvent, machineState, setMachin
         )}
       </div>
 
-      {/* Modallar (Açılır Pencereler) */}
+      {/* Modallar (A├ğ─▒l─▒r Pencereler) */}
       <ReasonModal
         isOpen={isStopModalOpen}
         onClose={() => setStopModalOpen(false)}
-        title="Duruş Sebebi Nedir?"
+        title="Duru┼ş Sebebi Nedir?"
         reasons={STOP_REASONS}
         onSelect={handleStopReasonSelect}
       />
@@ -172,7 +330,7 @@ function AdminLoginScreen({ onLogin, onBack }) {
         <Lock size={40} className="text-blue-600" />
       </div>
       <h2 className="text-3xl font-bold text-center text-gray-800 mb-8">
-        Admin Girişi
+        Admin Giri┼şi
       </h2>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
@@ -190,7 +348,7 @@ function AdminLoginScreen({ onLogin, onBack }) {
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Şifre
+            ┼Şifre
           </label>
           <input
             type="password"
@@ -198,7 +356,7 @@ function AdminLoginScreen({ onLogin, onBack }) {
             onChange={(e) => setPassword(e.target.value)}
             required
             className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="••••••••"
+            placeholder="ÔÇóÔÇóÔÇóÔÇóÔÇóÔÇóÔÇóÔÇó"
           />
         </div>
         <button
@@ -206,14 +364,14 @@ function AdminLoginScreen({ onLogin, onBack }) {
           disabled={loading}
           className="w-full p-4 bg-blue-600 text-white rounded-lg text-lg font-medium hover:bg-blue-700 transition-all duration-200 disabled:opacity-50"
         >
-          {loading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
+          {loading ? 'Giri┼ş yap─▒l─▒yor...' : 'Giri┼ş Yap'}
         </button>
       </form>
       <button
         onClick={onBack}
         className="w-full mt-4 p-3 bg-gray-200 text-gray-700 rounded-lg text-md font-medium hover:bg-gray-300 transition-all duration-200"
       >
-        Geri Dön
+        Geri D├Ân
       </button>
     </div>
   );
@@ -230,13 +388,13 @@ function AdminPanel({ session, onLogout }) {
           className="flex items-center gap-2 p-3 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-all duration-200"
         >
           <LogOut size={20} />
-          Çıkış Yap
+          ├ç─▒k─▒┼ş Yap
         </button>
       </div>
 
       <div className="text-center py-8">
         <p className="text-lg text-gray-600 mb-4">
-          Hoş geldiniz! Giriş başarılı.
+          Ho┼ş geldiniz! Giri┼ş ba┼şar─▒l─▒.
         </p>
         <p className="text-sm text-gray-500">
           Email: {session?.user?.email}
@@ -244,12 +402,12 @@ function AdminPanel({ session, onLogout }) {
       </div>
 
       <div className="mt-8 p-6 bg-blue-50 rounded-lg">
-        <h3 className="text-xl font-bold text-gray-800 mb-4">Gelecek Özellikler:</h3>
+        <h3 className="text-xl font-bold text-gray-800 mb-4">Gelecek ├ûzellikler:</h3>
         <ul className="list-disc list-inside text-gray-700 space-y-2">
-          <li>Operatör Ekleme/Çıkarma</li>
-          <li>Duruş ve Hata Sebeplerini Yönetme</li>
-          <li>Raporlar ve İstatistikler</li>
-          <li>Veri Görselleştirme</li>
+          <li>Operat├Âr Ekleme/├ç─▒karma</li>
+          <li>Duru┼ş ve Hata Sebeplerini Y├Ânetme</li>
+          <li>Raporlar ve ─░statistikler</li>
+          <li>Veri G├Ârselle┼ştirme</li>
         </ul>
       </div>
     </div>
@@ -257,9 +415,9 @@ function AdminPanel({ session, onLogout }) {
 }
 
 
-// --- YARDIMCI BİLEŞENLER ---
+// --- YARDIMCI B─░LE┼ŞENLER ---
 
-// Büyük Ana Eylem Butonu
+// B├╝y├╝k Ana Eylem Butonu
 function ActionButton({ text, onClick, icon, colorClass }) {
   return (
     <button
@@ -272,7 +430,7 @@ function ActionButton({ text, onClick, icon, colorClass }) {
   );
 }
 
-// Sebep Seçim Modalı (Duruş ve Hata için)
+// Sebep Se├ğim Modal─▒ (Duru┼ş ve Hata i├ğin)
 function ReasonModal({ isOpen, onClose, title, reasons, onSelect }) {
   if (!isOpen) return null;
 
@@ -295,7 +453,7 @@ function ReasonModal({ isOpen, onClose, title, reasons, onSelect }) {
           onClick={onClose}
           className="w-full mt-6 p-4 bg-gray-700 text-white rounded-lg text-lg font-medium hover:bg-gray-800 transition-all duration-200"
         >
-          İptal
+          ─░ptal
         </button>
       </div>
     </div>
