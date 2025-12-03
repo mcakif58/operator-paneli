@@ -65,27 +65,79 @@ export default function App() {
     fetchData();
   }, []);
 
-  // Bu fonksiyon Supabase'e veri gönderecek
-  const logEvent = async (type, reason) => {
-    const timestamp = new Date().toISOString();
+  // --- LOGLAMA FONKSİYONLARI ---
+
+  // 1. Sorunsuz Parça Loglama
+  const logPartCount = async (count) => {
     const logData = {
       operator_id: currentUser.id,
-      operator_name: currentUser.name,
-      event_type: type, // 'START', 'STOP', 'ERROR'
-      event_reason: reason, // 'Mola', 'Kalite Problemi' etc.
-      timestamp: timestamp,
+      adet: parseInt(count),
     };
 
-    console.log('EVENT LOGGED TO DATABASE:', logData);
+    try {
+      const { error } = await supabase.from('sorunsuz_parca_loglari').insert([logData]);
+      if (error) throw error;
+      console.log('Parça sayısı kaydedildi:', count);
+    } catch (error) {
+      console.error('Parça kaydı hatası:', error);
+      alert('Parça sayısı kaydedilirken hata oluştu: ' + error.message);
+    }
+  };
+
+  // 2. Hata Loglama
+  const logError = async (reason) => {
+    const logData = {
+      operator_id: currentUser.id,
+      sebep: reason,
+    };
 
     try {
-      const { error } = await supabase.from('logs').insert([logData]);
-      if (error) {
-        console.error('Supabase Hata:', error);
-        alert('Veri kaydedilirken hata oluştu: ' + error.message);
-      }
-    } catch (err) {
-      console.error('Beklenmeyen hata:', err);
+      const { error } = await supabase.from('hata_loglari').insert([logData]);
+      if (error) throw error;
+      console.log('Hata kaydedildi:', reason);
+    } catch (error) {
+      console.error('Hata kaydı hatası:', error);
+      alert('Hata kaydedilirken hata oluştu: ' + error.message);
+    }
+  };
+
+  // 3. Üretim Başlatma (Yeni Session)
+  const startProduction = async () => {
+    const logData = {
+      operator_id: currentUser.id,
+      baslangic: new Date().toISOString(),
+      bitis: null, // Açık session
+    };
+
+    try {
+      const { error } = await supabase.from('durus_loglari').insert([logData]);
+      if (error) throw error;
+      console.log('Üretim başlatıldı (Session Start)');
+    } catch (error) {
+      console.error('Başlatma hatası:', error);
+      alert('Üretim başlatılırken hata oluştu: ' + error.message);
+    }
+  };
+
+  // 4. Üretim Durdurma (Session Stop - Update)
+  const stopProduction = async (reason) => {
+    try {
+      // Bitis değeri NULL olan son kaydı bul ve güncelle
+      // Not: Basitlik için 'is null' filtresi kullanıyoruz.
+      // Eğer birden fazla açık kayıt varsa hepsini kapatır (ki bu istenen bir durum olabilir temizlik için).
+      const { error } = await supabase
+        .from('durus_loglari')
+        .update({
+          bitis: new Date().toISOString(),
+          sebep: reason
+        })
+        .is('bitis', null); // Bitis değeri NULL olanları hedefle
+
+      if (error) throw error;
+      console.log('Üretim durduruldu (Session Stop):', reason);
+    } catch (error) {
+      console.error('Durdurma hatası:', error);
+      alert('Üretim durdurulurken hata oluştu: ' + error.message);
     }
   };
 
@@ -142,7 +194,10 @@ export default function App() {
           <MainAppPanel
             currentUser={currentUser}
             onLogout={handleLogout}
-            logEvent={logEvent}
+            startProduction={startProduction}
+            stopProduction={stopProduction}
+            logError={logError}
+            logPartCount={logPartCount}
             machineState={machineState}
             setMachineState={setMachineState}
             stopReasons={stopReasons}
@@ -212,7 +267,7 @@ function OperatorSelectScreen({ operators, onSelectOperator, onGoToAdmin }) {
 }
 
 // --- 2. Ekran: Ana Operatör Paneli ---
-function MainAppPanel({ currentUser, onLogout, logEvent, machineState, setMachineState, stopReasons, errorReasons }) {
+function MainAppPanel({ currentUser, onLogout, startProduction, stopProduction, logError, logPartCount, machineState, setMachineState, stopReasons, errorReasons }) {
 
   const [isStopModalOpen, setStopModalOpen] = useState(false);
   const [isErrorModalOpen, setErrorModalOpen] = useState(false);
@@ -220,7 +275,7 @@ function MainAppPanel({ currentUser, onLogout, logEvent, machineState, setMachin
 
   // Üretimi Başlat
   const handleStart = () => {
-    logEvent('START', 'Üretim Başlatıldı');
+    startProduction();
     setMachineState('running');
   };
 
@@ -236,14 +291,14 @@ function MainAppPanel({ currentUser, onLogout, logEvent, machineState, setMachin
 
   // Duruş Sebebi Modal'ından seçim yapıldığında
   const handleStopReasonSelect = (reason) => {
-    logEvent('STOP', reason);
+    stopProduction(reason);
     setMachineState('stopped'); // veya 'idle'
     setStopModalOpen(false);
   };
 
   // Hata Sebebi Modal'ından seçim yapıldığında
   const handleErrorReasonSelect = (reason) => {
-    logEvent('ERROR', reason);
+    logError(reason);
     setErrorModalOpen(false);
   };
 
@@ -342,7 +397,7 @@ function MainAppPanel({ currentUser, onLogout, logEvent, machineState, setMachin
         isOpen={isPartCountModalOpen}
         onClose={() => setPartCountModalOpen(false)}
         onConfirm={(count) => {
-          console.log('Sorunsuz Parça Sayısı:', count);
+          logPartCount(count);
           setPartCountModalOpen(false);
         }}
       />
