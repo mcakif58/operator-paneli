@@ -71,6 +71,7 @@ export default function App() {
   const logPartCount = async (count) => {
     const logData = {
       operator_id: currentUser.user_id,
+      operator_name: currentUser.name,
       adet: parseInt(count),
     };
 
@@ -88,6 +89,7 @@ export default function App() {
   const logError = async (reason) => {
     const logData = {
       operator_id: currentUser.user_id,
+      operator_name: currentUser.name,
       sebep: reason,
     };
 
@@ -105,6 +107,7 @@ export default function App() {
   const startProduction = async () => {
     const logData = {
       operator_id: currentUser.user_id,
+      operator_name: currentUser.name,
       baslangic: new Date().toISOString(),
       bitis: null, // Açık session
     };
@@ -372,16 +375,16 @@ function MainAppPanel({ currentUser, onLogout, startProduction, stopProduction, 
               icon={<AlertTriangle size={40} />}
               colorClass="bg-yellow-500 hover:bg-yellow-600"
             />
-            <div className="col-span-2">
-              <ActionButton
-                text="Sorunsuz Parça Girdisi"
-                onClick={() => setPartCountModalOpen(true)}
-                icon={<Package size={40} />}
-                colorClass="bg-gray-800 hover:bg-gray-900"
-              />
-            </div>
           </div>
         )}
+
+        {/* Sorunsuz Parça Girdisi - Her zaman görünür (veya en azından giriş yapılmışsa) */}
+        <ActionButton
+          text="Sorunsuz Parça Girdisi"
+          onClick={() => setPartCountModalOpen(true)}
+          icon={<Package size={40} />}
+          colorClass="bg-gray-800 hover:bg-gray-900"
+        />
       </div>
 
       {/* Modallar (Açılır Pencereler) */}
