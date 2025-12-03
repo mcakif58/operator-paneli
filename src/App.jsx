@@ -1,5 +1,5 @@
 ﻿import React, { useState, useMemo, useEffect } from 'react';
-import { Database, User, Settings, AlertTriangle, Play, StopCircle, LogOut, CheckCircle, XCircle, Lock } from 'lucide-react';
+import { Database, User, Settings, AlertTriangle, Play, StopCircle, LogOut, CheckCircle, XCircle, Lock, Package } from 'lucide-react';
 import { supabase } from './supabase';
 import AdminPanel from './AdminPanel';
 
@@ -216,6 +216,7 @@ function MainAppPanel({ currentUser, onLogout, logEvent, machineState, setMachin
 
   const [isStopModalOpen, setStopModalOpen] = useState(false);
   const [isErrorModalOpen, setErrorModalOpen] = useState(false);
+  const [isPartCountModalOpen, setPartCountModalOpen] = useState(false);
 
   // Üretimi Başlat
   const handleStart = () => {
@@ -295,7 +296,7 @@ function MainAppPanel({ currentUser, onLogout, logEvent, machineState, setMachin
 
         {/* Makine ÜRETİMDE ise */}
         {machineState === 'running' && (
-          <>
+          <div className="grid grid-cols-2 gap-4">
             <ActionButton
               text="Üretimi Durdur"
               onClick={handleStopClick}
@@ -308,7 +309,15 @@ function MainAppPanel({ currentUser, onLogout, logEvent, machineState, setMachin
               icon={<AlertTriangle size={40} />}
               colorClass="bg-yellow-500 hover:bg-yellow-600"
             />
-          </>
+            <div className="col-span-2">
+              <ActionButton
+                text="Sorunsuz Parça Girdisi"
+                onClick={() => setPartCountModalOpen(true)}
+                icon={<Package size={40} />}
+                colorClass="bg-gray-800 hover:bg-gray-900"
+              />
+            </div>
+          </div>
         )}
       </div>
 
@@ -327,6 +336,15 @@ function MainAppPanel({ currentUser, onLogout, logEvent, machineState, setMachin
         title="Hata Sebebi Nedir?"
         reasons={errorReasons}
         onSelect={handleErrorReasonSelect}
+      />
+
+      <PartCountModal
+        isOpen={isPartCountModalOpen}
+        onClose={() => setPartCountModalOpen(false)}
+        onConfirm={(count) => {
+          console.log('Sorunsuz Parça Sayısı:', count);
+          setPartCountModalOpen(false);
+        }}
       />
     </div>
   );
@@ -441,6 +459,59 @@ function ReasonModal({ isOpen, onClose, title, reasons, onSelect }) {
         >
           İptal
         </button>
+      </div>
+    </div>
+  );
+}
+
+// Parça Sayısı Giriş Modalı
+function PartCountModal({ isOpen, onClose, onConfirm }) {
+  const [count, setCount] = useState('');
+
+  if (!isOpen) return null;
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (count) {
+      onConfirm(count);
+      setCount('');
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-fade-in">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+        <h3 className="text-2xl font-bold text-gray-800 mb-6 text-center border-b pb-4">
+          Sorunsuz Parça Sayısını Giriniz:
+        </h3>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <input
+              type="number"
+              value={count}
+              onChange={(e) => setCount(e.target.value)}
+              className="w-full p-4 text-3xl text-center border-2 border-gray-300 rounded-xl focus:ring-4 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+              placeholder="0"
+              autoFocus
+              min="1"
+            />
+          </div>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 p-4 bg-gray-200 text-gray-800 rounded-xl text-xl font-bold hover:bg-gray-300 transition-all duration-200"
+            >
+              İptal
+            </button>
+            <button
+              type="submit"
+              className="flex-1 p-4 bg-blue-600 text-white rounded-xl text-xl font-bold hover:bg-blue-700 transition-all duration-200"
+            >
+              Onayla
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
