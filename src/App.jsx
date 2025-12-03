@@ -122,19 +122,27 @@ export default function App() {
   // 4. Üretim Durdurma (Session Stop - Update)
   const stopProduction = async (reason) => {
     try {
-      // Bitis değeri NULL olan son kaydı bul ve güncelle
-      // Not: Basitlik için 'is null' filtresi kullanıyoruz.
-      // Eğer birden fazla açık kayıt varsa hepsini kapatır (ki bu istenen bir durum olabilir temizlik için).
-      const { error } = await supabase
+      console.log('Stopping production for user:', currentUser.user_id);
+
+      // Bitis değeri NULL olan ve bu kullanıcıya ait son kaydı bul ve güncelle
+      const { data, error } = await supabase
         .from('durus_loglari')
         .update({
           bitis: new Date().toISOString(),
           sebep: reason
         })
-        .is('bitis', null); // Bitis değeri NULL olanları hedefle
+        .eq('operator_id', currentUser.user_id) // Sadece bu operatörün kayıtlarını güncelle
+        .is('bitis', null) // Bitis değeri NULL olanları hedefle
+        .select();
 
       if (error) throw error;
-      console.log('Üretim durduruldu (Session Stop):', reason);
+
+      if (data && data.length === 0) {
+        console.warn('No open session found to stop.');
+        // Kullanıcıya uyarı vermiyoruz çünkü belki de zaten kapalıdır, ama logluyoruz.
+      } else {
+        console.log('Üretim durduruldu (Session Stop):', reason, data);
+      }
     } catch (error) {
       console.error('Durdurma hatası:', error);
       alert('Üretim durdurulurken hata oluştu: ' + error.message);
