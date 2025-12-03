@@ -125,15 +125,23 @@ export default function App() {
   // 4. Üretim Durdurma (Session Stop - Update)
   const stopProduction = async (reason) => {
     try {
-      console.log('Stopping production for user:', currentUser.user_id);
+      console.log('--- STOP PRODUCTION DEBUG START ---');
+      console.log('Current User Object:', currentUser);
+      console.log('Searching for operator_id:', currentUser.user_id);
+
+      if (!currentUser.user_id) {
+        console.error('CRITICAL: currentUser.user_id is missing/null!');
+        alert('Hata: Operatör kimliği (user_id) bulunamadı. Lütfen admin panelinden operatörü silip tekrar ekleyin.');
+        return;
+      }
 
       // ADIM 1: Açık olan son oturumu bul (En son başlayan)
       const { data: openSessions, error: fetchError } = await supabase
         .from('durus_loglari')
-        .select('id, baslangic')
+        .select('*') // Tüm sütunları görelim
         .eq('operator_id', currentUser.user_id)
         .is('bitis', null)
-        .order('baslangic', { ascending: false }) // En yeni kaydı önce getir
+        .order('baslangic', { ascending: false })
         .limit(1);
 
       if (fetchError) {
@@ -141,11 +149,22 @@ export default function App() {
         throw fetchError;
       }
 
-      console.log('Bulunan açık oturumlar:', openSessions);
+      console.log('Bulunan açık oturumlar (Query Result):', openSessions);
 
       if (!openSessions || openSessions.length === 0) {
         console.warn('Kapatılacak açık bir oturum bulunamadı.');
-        alert('Şu anda açık bir üretim kaydı görünmüyor.');
+
+        // DEBUG: Hiç kayıt var mı bakalım?
+        console.log('DEBUG: Bu kullanıcı için TÜM kayıtları kontrol ediyorum...');
+        const { data: allRows } = await supabase
+          .from('durus_loglari')
+          .select('*')
+          .eq('operator_id', currentUser.user_id)
+          .order('baslangic', { ascending: false })
+          .limit(5);
+        console.log('DEBUG: Son 5 kayıt (Tümü):', allRows);
+
+        alert('Şu anda açık bir üretim kaydı görünmüyor. (Detaylar konsolda)');
         return;
       }
 
@@ -159,7 +178,7 @@ export default function App() {
           bitis: new Date().toISOString(),
           sebep: reason
         })
-        .eq('id', sessionToClose.id) // ID ile hedefle
+        .eq('id', sessionToClose.id)
         .select();
 
       if (updateError) {
@@ -168,10 +187,7 @@ export default function App() {
       }
 
       console.log('Üretim durdurma işlemi başarılı. Güncellenen kayıt:', updatedData);
-
-      if (updatedData && updatedData.length > 0) {
-        console.log('Güncellenen satır sayısı:', updatedData.length);
-      }
+      console.log('--- STOP PRODUCTION DEBUG END ---');
 
     } catch (error) {
       console.error('Genel Durdurma hatası:', error);
