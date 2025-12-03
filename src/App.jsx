@@ -70,7 +70,7 @@ export default function App() {
   // 1. Sorunsuz Parça Loglama
   const logPartCount = async (count) => {
     const logData = {
-      operator_id: currentUser.id,
+      operator_id: currentUser.user_id,
       adet: parseInt(count),
     };
 
@@ -87,7 +87,7 @@ export default function App() {
   // 2. Hata Loglama
   const logError = async (reason) => {
     const logData = {
-      operator_id: currentUser.id,
+      operator_id: currentUser.user_id,
       sebep: reason,
     };
 
@@ -104,7 +104,7 @@ export default function App() {
   // 3. Üretim Başlatma (Yeni Session)
   const startProduction = async () => {
     const logData = {
-      operator_id: currentUser.id,
+      operator_id: currentUser.user_id,
       baslangic: new Date().toISOString(),
       bitis: null, // Açık session
     };
