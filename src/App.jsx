@@ -105,17 +105,19 @@ export default function App() {
 
   // 3. Üretim Başlatma (Yeni Session)
   const startProduction = async () => {
+    console.log('--- START PRODUCTION DEBUG ---');
     const logData = {
       operator_id: currentUser.user_id,
       operator_name: currentUser.name,
       baslangic: new Date().toISOString(),
       bitis: null, // Açık session
     };
+    console.log('Inserting start record:', logData);
 
     try {
-      const { error } = await supabase.from('durus_loglari').insert([logData]);
+      const { data, error } = await supabase.from('durus_loglari').insert([logData]).select();
       if (error) throw error;
-      console.log('Üretim başlatıldı (Session Start)');
+      console.log('Üretim başlatıldı (Session Start). Inserted Data:', data);
     } catch (error) {
       console.error('Başlatma hatası:', error);
       alert('Üretim başlatılırken hata oluştu: ' + error.message);

@@ -9,10 +9,13 @@ drop policy if exists "Enable update for authenticated users only" on durus_logl
 
 -- 1. Sorunsuz Parça Logları
 create policy "Enable insert for all users" on sorunsuz_parca_loglari for insert to public with check (true);
+create policy "Enable select for all users" on sorunsuz_parca_loglari for select to public using (true);
 
 -- 2. Hata Logları
 create policy "Enable insert for all users" on hata_loglari for insert to public with check (true);
+create policy "Enable select for all users" on hata_loglari for select to public using (true);
 
 -- 3. Duruş Logları
 create policy "Enable insert for all users" on durus_loglari for insert to public with check (true);
 create policy "Enable update for all users" on durus_loglari for update to public using (true);
+create policy "Enable select for all users" on durus_loglari for select to public using (true);
