@@ -127,27 +127,54 @@ export default function App() {
     try {
       console.log('Stopping production for user:', currentUser.user_id);
 
-      // Bitis değeri NULL olan ve bu kullanıcıya ait son kaydı bul ve güncelle
-      const { data, error } = await supabase
+      // ADIM 1: Açık olan son oturumu bul (En son başlayan)
+      const { data: openSessions, error: fetchError } = await supabase
+        .from('durus_loglari')
+        .select('id, baslangic')
+        .eq('operator_id', currentUser.user_id)
+        .is('bitis', null)
+        .order('baslangic', { ascending: false }) // En yeni kaydı önce getir
+        .limit(1);
+
+      if (fetchError) {
+        console.error('Açık oturum arama hatası:', fetchError);
+        throw fetchError;
+      }
+
+      console.log('Bulunan açık oturumlar:', openSessions);
+
+      if (!openSessions || openSessions.length === 0) {
+        console.warn('Kapatılacak açık bir oturum bulunamadı.');
+        alert('Şu anda açık bir üretim kaydı görünmüyor.');
+        return;
+      }
+
+      const sessionToClose = openSessions[0];
+      console.log('Kapatılacak oturum ID:', sessionToClose.id);
+
+      // ADIM 2: Bulunan oturumu güncelle
+      const { data: updatedData, error: updateError } = await supabase
         .from('durus_loglari')
         .update({
           bitis: new Date().toISOString(),
           sebep: reason
         })
-        .eq('operator_id', currentUser.user_id) // Sadece bu operatörün kayıtlarını güncelle
-        .is('bitis', null) // Bitis değeri NULL olanları hedefle
+        .eq('id', sessionToClose.id) // ID ile hedefle
         .select();
 
-      if (error) throw error;
-
-      if (data && data.length === 0) {
-        console.warn('No open session found to stop.');
-        // Kullanıcıya uyarı vermiyoruz çünkü belki de zaten kapalıdır, ama logluyoruz.
-      } else {
-        console.log('Üretim durduruldu (Session Stop):', reason, data);
+      if (updateError) {
+        console.error('Güncelleme hatası:', updateError);
+        throw updateError;
       }
+
+      console.log('Üretim durdurma işlemi başarılı. Güncellenen kayıt:', updatedData);
+
+      if (updatedData && updatedData.length > 0) {
+        console.log('Güncellenen satır sayısı:', updatedData.length);
+      }
+
     } catch (error) {
-      console.error('Durdurma hatası:', error);
+      console.error('Genel Durdurma hatası:', error);
       alert('Üretim durdurulurken hata oluştu: ' + error.message);
     }
   };
