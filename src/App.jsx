@@ -278,7 +278,12 @@ export default function App() {
       case 'adminLogin':
         return <AdminLoginScreen onLogin={handleAdminLogin} onBack={() => setCurrentPage('login')} />;
       case 'login':
-        return <OperatorSelectScreen operators={operators} onSelectOperator={handleOperatorLogin} onGoToAdmin={handleAdminLoginRequest} />;
+      default:
+        return (
+          <div className="scale-[1.5] origin-center">
+            <OperatorSelectScreen operators={operators} onSelectOperator={handleOperatorLogin} onGoToAdmin={handleAdminLoginRequest} />
+          </div>
+        );
     }
   };
 
