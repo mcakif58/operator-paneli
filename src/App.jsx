@@ -247,18 +247,20 @@ export default function App() {
     switch (currentPage) {
       case 'app':
         return (
-          <MainAppPanel
-            currentUser={currentUser}
-            onLogout={handleLogout}
-            startProduction={startProduction}
-            stopProduction={stopProduction}
-            logError={logError}
-            logPartCount={logPartCount}
-            machineState={machineState}
-            setMachineState={setMachineState}
-            stopReasons={stopReasons}
-            errorReasons={errorReasons}
-          />
+          <div className="scale-[1.2] origin-center">
+            <MainAppPanel
+              currentUser={currentUser}
+              onLogout={handleLogout}
+              startProduction={startProduction}
+              stopProduction={stopProduction}
+              logError={logError}
+              logPartCount={logPartCount}
+              machineState={machineState}
+              setMachineState={setMachineState}
+              stopReasons={stopReasons}
+              errorReasons={errorReasons}
+            />
+          </div>
         );
       case 'admin':
         return (
@@ -276,14 +278,13 @@ export default function App() {
       case 'adminLogin':
         return <AdminLoginScreen onLogin={handleAdminLogin} onBack={() => setCurrentPage('login')} />;
       case 'login':
-      default:
         return <OperatorSelectScreen operators={operators} onSelectOperator={handleOperatorLogin} onGoToAdmin={handleAdminLoginRequest} />;
     }
   };
 
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-4xl flex justify-center scale-[1.5]">
+      <div className="w-full max-w-4xl flex justify-center">
         {renderPage()}
       </div>
     </div>
