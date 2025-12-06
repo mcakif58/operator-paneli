@@ -379,7 +379,7 @@ function MainAppPanel({ currentUser, onLogout, startProduction, stopProduction, 
   }, [machineState]);
 
   return (
-    <div className="bg-white p-10 rounded-2xl shadow-xl w-full max-w-2xl animate-fade-in">
+    <div className="w-full max-w-2xl animate-fade-in">
       {/* Üst Bilgi */}
       <div className="flex justify-between items-center mb-6 pb-4 border-b border-gray-200">
         <div>
