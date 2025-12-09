@@ -3,9 +3,6 @@ import { Database, User, Settings, AlertTriangle, Play, StopCircle, LogOut, Chec
 import { supabase } from './supabase';
 import AdminPanel from './AdminPanel';
 
-
-
-
 // --- Ana Uygulama Bileşeni ---
 export default function App() {
   const [currentPage, setCurrentPage] = useState('login'); // 'login', 'app', 'admin', 'adminLogin'
@@ -372,8 +369,6 @@ function MainAppPanel({ currentUser, onLogout, startProduction, stopProduction, 
     fetchLastError();
 
     // Periyodik olarak (örneğin her 10 saniyede bir) süreyi kontrol et
-    // Ancak sadece butona basınca kontrol etmek daha performanslı olabilir.
-    // UI'daki butonu disable etmek için interval kullanabiliriz.
     const interval = setInterval(() => {
       if (lastError) {
         checkTimeLimit();
@@ -441,7 +436,7 @@ function MainAppPanel({ currentUser, onLogout, startProduction, stopProduction, 
     }
   };
 
-  // Hata Düzeltme İşlemi
+  // Hata Düzeltme İşlemi - GÜNCELLENDİ: Tarihçe de ekleniyor.
   const handleCorrectionSelect = async (newReason) => {
     if (!lastError) return;
 
@@ -450,7 +445,8 @@ function MainAppPanel({ currentUser, onLogout, startProduction, stopProduction, 
         .from('hata_loglari')
         .update({
           sebep: newReason,
-          eski_sebep: lastError.sebep
+          eski_sebep: lastError.sebep,
+          duzeltilme_zamani: new Date().toISOString() // YENİ: Düzeltilme zamanı
         })
         .eq('id', lastError.id);
 
@@ -464,7 +460,12 @@ function MainAppPanel({ currentUser, onLogout, startProduction, stopProduction, 
 
     } catch (err) {
       console.error('Hata düzeltme hatası:', err);
-      alert('Hata düzeltilirken bir sorun oluştu: ' + err.message);
+      // Hata mesajını daha anlaşılır yapalım
+      if (err.message && err.message.includes('policy')) {
+        alert('Hata düzeltme yetkisi reddedildi. Lütfen veritabanı politikalarını (RLS) kontrol edin.');
+      } else {
+        alert('Hata düzeltilirken bir sorun oluştu: ' + err.message);
+      }
     }
   };
 
