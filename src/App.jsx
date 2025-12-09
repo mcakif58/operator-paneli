@@ -1,5 +1,5 @@
 ﻿import React, { useState, useMemo, useEffect } from 'react';
-import { Database, User, Settings, AlertTriangle, Play, StopCircle, LogOut, CheckCircle, XCircle, Lock, Package } from 'lucide-react';
+import { Database, User, Settings, AlertTriangle, Play, StopCircle, LogOut, CheckCircle, XCircle, Lock, Package, Pencil } from 'lucide-react';
 import { supabase } from './supabase';
 import AdminPanel from './AdminPanel';
 
@@ -337,6 +337,68 @@ function MainAppPanel({ currentUser, onLogout, startProduction, stopProduction, 
   const [isErrorModalOpen, setErrorModalOpen] = useState(false);
   const [isPartCountModalOpen, setPartCountModalOpen] = useState(false);
 
+  // Hata düzeltme ile ilgili state'ler
+  const [lastError, setLastError] = useState(null);
+  const [isCorrectionModalOpen, setCorrectionModalOpen] = useState(false);
+  const [canEditError, setCanEditError] = useState(false);
+
+  // Son hatayı getir
+  const fetchLastError = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('hata_loglari')
+        .select('*')
+        .eq('operator_id', currentUser.user_id)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error) {
+        console.error('Son hata getirme hatası:', error);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        setLastError(data[0]);
+      } else {
+        setLastError(null);
+      }
+    } catch (err) {
+      console.error('Beklenmedik hata:', err);
+    }
+  };
+
+  // Bileşen yüklendiğinde veya kullanıcı değiştiğinde son hatayı çek
+  useEffect(() => {
+    fetchLastError();
+
+    // Periyodik olarak (örneğin her 10 saniyede bir) süreyi kontrol et
+    // Ancak sadece butona basınca kontrol etmek daha performanslı olabilir.
+    // UI'daki butonu disable etmek için interval kullanabiliriz.
+    const interval = setInterval(() => {
+      if (lastError) {
+        checkTimeLimit();
+      }
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [currentUser]);
+
+  // lastError değiştiğinde zaman sınırını kontrol et
+  useEffect(() => {
+    checkTimeLimit();
+  }, [lastError]);
+
+  const checkTimeLimit = () => {
+    if (!lastError) {
+      setCanEditError(false);
+      return;
+    }
+    const errorTime = new Date(lastError.created_at).getTime();
+    const now = new Date().getTime();
+    const diffMinutes = (now - errorTime) / (1000 * 60);
+    setCanEditError(diffMinutes <= 5);
+  };
+
   // Üretimi Başlat
   const handleStart = () => {
     startProduction();
@@ -361,9 +423,49 @@ function MainAppPanel({ currentUser, onLogout, startProduction, stopProduction, 
   };
 
   // Hata Sebebi Modal'ından seçim yapıldığında
-  const handleErrorReasonSelect = (reason) => {
-    logError(reason);
+  const handleErrorReasonSelect = async (reason) => {
+    await logError(reason);
     setErrorModalOpen(false);
+    // Yeni hata eklendiğinde son hatayı güncelle
+    fetchLastError();
+  };
+
+  // Hata Düzeltme Butonuna Tıklama
+  const handleCorrectionClick = () => {
+    checkTimeLimit(); // Son bir kontrol
+    if (canEditError) {
+      setCorrectionModalOpen(true);
+    } else {
+      alert("Bu hatayı düzenleme süresi (5 dakika) dolmuştur.");
+      fetchLastError(); // Belki süresi doldu, arayüzü güncelle
+    }
+  };
+
+  // Hata Düzeltme İşlemi
+  const handleCorrectionSelect = async (newReason) => {
+    if (!lastError) return;
+
+    try {
+      const { error } = await supabase
+        .from('hata_loglari')
+        .update({
+          sebep: newReason,
+          eski_sebep: lastError.sebep
+        })
+        .eq('id', lastError.id);
+
+      if (error) {
+        throw error;
+      }
+
+      console.log('Hata düzeltildi. Eski:', lastError.sebep, 'Yeni:', newReason);
+      setCorrectionModalOpen(false);
+      fetchLastError(); // Güncel veriyi çek
+
+    } catch (err) {
+      console.error('Hata düzeltme hatası:', err);
+      alert('Hata düzeltilirken bir sorun oluştu: ' + err.message);
+    }
   };
 
   const statusConfig = useMemo(() => {
@@ -379,7 +481,7 @@ function MainAppPanel({ currentUser, onLogout, startProduction, stopProduction, 
   }, [machineState]);
 
   return (
-    <div className="bg-white p-12 rounded-2xl shadow-xl w-full max-w-3xl animate-fade-in">
+    <div className="bg-white p-12 rounded-2xl shadow-xl w-full max-w-3xl animate-fade-in relative pb-24">
       {/* Üst Bilgi */}
       <div className="flex justify-between items-center mb-6 pb-4 border-b border-gray-200">
         <div>
@@ -440,6 +542,29 @@ function MainAppPanel({ currentUser, onLogout, startProduction, stopProduction, 
         />
       </div>
 
+      {/* SON HATA GÖSTERİMİ VE DEĞİŞTİRME ALANI */}
+      {lastError && (
+        <div className="absolute bottom-0 left-0 w-full bg-gray-50 rounded-b-2xl border-t border-gray-200 p-4 px-8 flex justify-between items-center transition-all">
+          <div>
+            <span className="block text-xs text-gray-500 font-semibold uppercase tracking-wide">Son Kaydedilen Hata</span>
+            <span className="text-gray-800 font-medium text-lg">{lastError.sebep}</span>
+          </div>
+
+          <button
+            onClick={handleCorrectionClick}
+            disabled={!canEditError}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-colors duration-200 ${canEditError
+                ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              }`}
+            title={canEditError ? "Hata sebebini değiştir" : "Değiştirme süresi doldu"}
+          >
+            <Pencil size={18} />
+            Değiştir
+          </button>
+        </div>
+      )}
+
       {/* Modallar (Açılır Pencereler) */}
       <ReasonModal
         isOpen={isStopModalOpen}
@@ -455,6 +580,15 @@ function MainAppPanel({ currentUser, onLogout, startProduction, stopProduction, 
         title="Hata Sebebi Nedir?"
         reasons={errorReasons}
         onSelect={handleErrorReasonSelect}
+      />
+
+      {/* Hata Düzeltme Modalı - Hata sebepleri listesini kullanır */}
+      <ReasonModal
+        isOpen={isCorrectionModalOpen}
+        onClose={() => setCorrectionModalOpen(false)}
+        title="Hata sebebini ne ile değiştirmek istiyorsunuz?"
+        reasons={errorReasons}
+        onSelect={handleCorrectionSelect}
       />
 
       <PartCountModal
