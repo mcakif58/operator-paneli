@@ -1,5 +1,5 @@
 ﻿import React, { useState, useMemo, useEffect } from 'react';
-import { Database, User, Settings, AlertTriangle, Play, StopCircle, LogOut, CheckCircle, XCircle, Lock, Package, Pencil } from 'lucide-react';
+import { Database, User, Settings, AlertTriangle, Play, StopCircle, LogOut, CheckCircle, XCircle, Lock, Package, Pencil, Monitor } from 'lucide-react';
 import { supabase } from './supabase';
 import AdminPanel from './AdminPanel';
 
@@ -14,18 +14,37 @@ export default function App() {
   const [stopReasons, setStopReasons] = useState([]);
   const [errorReasons, setErrorReasons] = useState([]);
 
+  // Makine ID State'i
+  const [machineId, setMachineId] = useState(null);
+
   // İYİLEŞTİRME: Makine durumunu (state) ana bileşene taşıdık.
   // Bu sayede çıkış yapıldığında durumu sıfırlayabiliriz.
   const [machineState, setMachineState] = useState('idle'); // 'idle', 'running', 'stopped'
 
+  // URL'den ID okuma ve veri çekme
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const idFromUrl = params.get('id');
+
+    if (idFromUrl) {
+      setMachineId(idFromUrl);
+    } else {
+      // Makine ID yoksa, ekranı boş/uyarı modunda bırakabiliriz.
+      // Şimdilik null kalması, render kısmında uyarı göstermemizi sağlar.
+    }
+  }, []);
+
   // Fetch data from Supabase on mount
   useEffect(() => {
+    if (!machineId) return; // ID yoksa veri çekme
+
     const fetchData = async () => {
       try {
-        // Fetch operators
+        // Fetch operators (Machine Isolated)
         const { data: operatorsData, error: operatorsError } = await supabase
           .from('operators')
           .select('*')
+          .eq('machine_id', machineId)
           .order('id');
         if (!operatorsError && operatorsData) {
           setOperators(operatorsData);
@@ -33,10 +52,11 @@ export default function App() {
           console.error('Error fetching operators:', operatorsError);
         }
 
-        // Fetch stop reasons
+        // Fetch stop reasons (Machine Isolated)
         const { data: stopReasonsData, error: stopReasonsError } = await supabase
           .from('stop_reasons')
           .select('*')
+          .eq('machine_id', machineId)
           .order('id');
         if (!stopReasonsError && stopReasonsData) {
           setStopReasons(stopReasonsData.map(r => r.reason));
@@ -44,10 +64,11 @@ export default function App() {
           console.error('Error fetching stop reasons:', stopReasonsError);
         }
 
-        // Fetch error reasons
+        // Fetch error reasons (Machine Isolated)
         const { data: errorReasonsData, error: errorReasonsError } = await supabase
           .from('error_reasons')
           .select('*')
+          .eq('machine_id', machineId)
           .order('id');
         if (!errorReasonsError && errorReasonsData) {
           setErrorReasons(errorReasonsData.map(r => r.reason));
@@ -60,7 +81,7 @@ export default function App() {
     };
 
     fetchData();
-  }, []);
+  }, [machineId]);
 
   // --- LOGLAMA FONKSİYONLARI ---
 
@@ -70,6 +91,7 @@ export default function App() {
       operator_id: currentUser.user_id,
       operator_name: currentUser.name,
       adet: parseInt(count),
+      machine_id: machineId // Makine ID eklendi
     };
 
     try {
@@ -88,6 +110,7 @@ export default function App() {
       operator_id: currentUser.user_id,
       operator_name: currentUser.name,
       sebep: reason,
+      machine_id: machineId // Makine ID eklendi
     };
 
     try {
@@ -108,6 +131,7 @@ export default function App() {
       operator_name: currentUser.name,
       baslangic: new Date().toISOString(),
       bitis: null, // Açık session
+      machine_id: machineId // Makine ID eklendi
     };
     console.log('Inserting start record:', logData);
 
@@ -134,11 +158,12 @@ export default function App() {
         return;
       }
 
-      // ADIM 1: Açık olan son oturumu bul (En son başlayan)
+      // ADIM 1: Açık olan son oturumu bul (En son başlayan) for CURRENT MACHINE
       const { data: openSessions, error: fetchError } = await supabase
         .from('durus_loglari')
         .select('*') // Tüm sütunları görelim
         .eq('operator_id', currentUser.user_id)
+        .eq('machine_id', machineId) // Sadece bu makinedeki oturumu kapat
         .is('bitis', null)
         .order('baslangic', { ascending: false })
         .limit(1);
@@ -159,6 +184,7 @@ export default function App() {
           .from('durus_loglari')
           .select('*')
           .eq('operator_id', currentUser.user_id)
+          .eq('machine_id', machineId)
           .order('baslangic', { ascending: false })
           .limit(5);
         console.log('DEBUG: Son 5 kayıt (Tümü):', allRows);
@@ -239,6 +265,23 @@ export default function App() {
     setCurrentPage('login');
   };
 
+  // Eğer Makine ID yoksa Uyarı Ekranı Göster
+  if (!machineId) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+        <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md text-center">
+          <Monitor size={64} className="mx-auto text-red-500 mb-6" />
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">Makine Kimliği Bulunamadı</h2>
+          <p className="text-gray-600 mb-6">
+            Bu panele erişmek için lütfen URL'de bir makine kimliği belirtin.
+            <br />
+            <span className="font-mono bg-gray-100 p-1 rounded text-sm">Örnek: .../?id=1</span>
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   // Hangi ekranın gösterileceğini seçen kısım
   const renderPage = () => {
     switch (currentPage) {
@@ -255,6 +298,7 @@ export default function App() {
             setMachineState={setMachineState}
             stopReasons={stopReasons}
             errorReasons={errorReasons}
+            machineId={machineId}
           />
         );
       case 'admin':
@@ -268,6 +312,7 @@ export default function App() {
             setStopReasons={setStopReasons}
             errorReasons={errorReasons}
             setErrorReasons={setErrorReasons}
+            machineId={machineId} // Admin paneline makine kimliğini gönderiyoruz
           />
         );
       case 'adminLogin':
@@ -303,16 +348,24 @@ function OperatorSelectScreen({ operators, onSelectOperator, onGoToAdmin }) {
         Operatör Seçin
       </h2>
       <div className="grid grid-cols-1 gap-4">
-        {operators.map((op) => (
-          <button
-            key={op.id}
-            onClick={() => onSelectOperator(op)}
-            className="flex items-center justify-center gap-4 p-6 bg-blue-600 text-white rounded-xl text-2xl font-semibold shadow-lg hover:bg-blue-700 transition-all duration-200 transform hover:scale-105"
-          >
-            <User size={30} />
-            {op.name}
-          </button>
-        ))}
+        {operators.length === 0 ? (
+          <div className="text-center text-gray-500 py-8">
+            Bu makine için tanımlı operatör bulunamadı.
+            <br />
+            Lütfen Admin Panelinden ekleyin.
+          </div>
+        ) : (
+          operators.map((op) => (
+            <button
+              key={op.id}
+              onClick={() => onSelectOperator(op)}
+              className="flex items-center justify-center gap-4 p-6 bg-blue-600 text-white rounded-xl text-2xl font-semibold shadow-lg hover:bg-blue-700 transition-all duration-200 transform hover:scale-105"
+            >
+              <User size={30} />
+              {op.name}
+            </button>
+          ))
+        )}
       </div>
       <div className="mt-8 text-center">
         <button
@@ -328,7 +381,7 @@ function OperatorSelectScreen({ operators, onSelectOperator, onGoToAdmin }) {
 }
 
 // --- 2. Ekran: Ana Operatör Paneli ---
-function MainAppPanel({ currentUser, onLogout, startProduction, stopProduction, logError, logPartCount, machineState, setMachineState, stopReasons, errorReasons }) {
+function MainAppPanel({ currentUser, onLogout, startProduction, stopProduction, logError, logPartCount, machineState, setMachineState, stopReasons, errorReasons, machineId }) {
 
   const [isStopModalOpen, setStopModalOpen] = useState(false);
   const [isErrorModalOpen, setErrorModalOpen] = useState(false);
@@ -346,6 +399,7 @@ function MainAppPanel({ currentUser, onLogout, startProduction, stopProduction, 
         .from('hata_loglari')
         .select('*')
         .eq('operator_id', currentUser.user_id)
+        .eq('machine_id', machineId) // Filter by machine
         .order('created_at', { ascending: false })
         .limit(1);
 
@@ -376,7 +430,7 @@ function MainAppPanel({ currentUser, onLogout, startProduction, stopProduction, 
     }, 10000);
 
     return () => clearInterval(interval);
-  }, [currentUser]);
+  }, [currentUser, machineId]); // Re-run if user or machine changes
 
   // lastError değiştiğinde zaman sınırını kontrol et
   useEffect(() => {
@@ -436,7 +490,7 @@ function MainAppPanel({ currentUser, onLogout, startProduction, stopProduction, 
     }
   };
 
-  // Hata Düzeltme İşlemi - GÜNCELLENDİ: Tarihçe de ekleniyor.
+  // Hata Düzeltme İşlemi
   const handleCorrectionSelect = async (newReason) => {
     if (!lastError) return;
 
@@ -446,7 +500,7 @@ function MainAppPanel({ currentUser, onLogout, startProduction, stopProduction, 
         .update({
           sebep: newReason,
           eski_sebep: lastError.sebep,
-          duzeltilme_zamani: new Date().toISOString() // YENİ: Düzeltilme zamanı
+          duzeltilme_zamani: new Date().toISOString()
         })
         .eq('id', lastError.id);
 
@@ -460,7 +514,6 @@ function MainAppPanel({ currentUser, onLogout, startProduction, stopProduction, 
 
     } catch (err) {
       console.error('Hata düzeltme hatası:', err);
-      // Hata mesajını daha anlaşılır yapalım
       if (err.message && err.message.includes('policy')) {
         alert('Hata düzeltme yetkisi reddedildi. Lütfen veritabanı politikalarını (RLS) kontrol edin.');
       } else {
@@ -472,14 +525,14 @@ function MainAppPanel({ currentUser, onLogout, startProduction, stopProduction, 
   const statusConfig = useMemo(() => {
     switch (machineState) {
       case 'running':
-        return { text: 'ÜRETİMDE', icon: <CheckCircle size={24} />, color: 'bg-green-100 text-green-800' };
+        return { text: 'ÜRETİMDE (#' + machineId + ')', icon: <CheckCircle size={24} />, color: 'bg-green-100 text-green-800' };
       case 'stopped':
-        return { text: 'DURUŞTA', icon: <XCircle size={24} />, color: 'bg-red-100 text-red-800' };
+        return { text: 'DURUŞTA (#' + machineId + ')', icon: <XCircle size={24} />, color: 'bg-red-100 text-red-800' };
       case 'idle':
       default:
-        return { text: 'BEKLEMEDE', icon: <Database size={24} />, color: 'bg-gray-200 text-gray-800' };
+        return { text: 'BEKLEMEDE (#' + machineId + ')', icon: <Database size={24} />, color: 'bg-gray-200 text-gray-800' };
     }
-  }, [machineState]);
+  }, [machineState, machineId]);
 
   return (
     <div className="bg-white p-12 rounded-2xl shadow-xl w-full max-w-3xl animate-fade-in relative pb-24">
@@ -489,13 +542,18 @@ function MainAppPanel({ currentUser, onLogout, startProduction, stopProduction, 
           <span className="text-sm text-gray-500">Aktif Operatör</span>
           <h3 className="text-xl font-bold text-gray-900">{currentUser.name}</h3>
         </div>
-        <button
-          onClick={onLogout} // Artık App'ten gelen ana çıkış fonksiyonunu çağırıyoruz
-          className="p-3 bg-gray-100 rounded-full text-gray-600 hover:bg-red-100 hover:text-red-600 transition-all duration-200"
-          title="Operatör Değiştir"
-        >
-          <LogOut size={20} />
-        </button>
+        <div className="flex items-center gap-2">
+          <span className="px-3 py-1 bg-gray-100 rounded text-xs font-mono text-gray-500">
+            Makine ID: {machineId}
+          </span>
+          <button
+            onClick={onLogout} // Artık App'ten gelen ana çıkış fonksiyonunu çağırıyoruz
+            className="p-3 bg-gray-100 rounded-full text-gray-600 hover:bg-red-100 hover:text-red-600 transition-all duration-200"
+            title="Operatör Değiştir"
+          >
+            <LogOut size={20} />
+          </button>
+        </div>
       </div>
 
       {/* Durum Göstergesi */}

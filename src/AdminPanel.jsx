@@ -2,28 +2,30 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, LogOut } from 'lucide-react';
 import { supabase } from './supabase';
 
-export default function AdminPanel({ session, onLogout, operators, setOperators, stopReasons, setStopReasons, errorReasons, setErrorReasons }) {
+export default function AdminPanel({ session, onLogout, operators, setOperators, stopReasons, setStopReasons, errorReasons, setErrorReasons, machineId }) {
     const [activeTab, setActiveTab] = useState('operators');
 
     // Fetch data from Supabase on mount
     useEffect(() => {
-        fetchOperators();
-        fetchStopReasons();
-        fetchErrorReasons();
-    }, []);
+        if (machineId) {
+            fetchOperators();
+            fetchStopReasons();
+            fetchErrorReasons();
+        }
+    }, [machineId]);
 
     const fetchOperators = async () => {
-        const { data, error } = await supabase.from('operators').select('*').order('id');
+        const { data, error } = await supabase.from('operators').select('*').eq('machine_id', machineId).order('id');
         if (!error && data) setOperators(data);
     };
 
     const fetchStopReasons = async () => {
-        const { data, error } = await supabase.from('stop_reasons').select('*').order('id');
+        const { data, error } = await supabase.from('stop_reasons').select('*').eq('machine_id', machineId).order('id');
         if (!error && data) setStopReasons(data.map(r => r.reason));
     };
 
     const fetchErrorReasons = async () => {
-        const { data, error } = await supabase.from('error_reasons').select('*').order('id');
+        const { data, error } = await supabase.from('error_reasons').select('*').eq('machine_id', machineId).order('id');
         if (!error && data) setErrorReasons(data.map(r => r.reason));
     };
 
@@ -39,7 +41,8 @@ export default function AdminPanel({ session, onLogout, operators, setOperators,
         const { data, error } = await supabase.from('operators').insert([{
             name,
             role,
-            user_id: user.id
+            user_id: user.id,
+            machine_id: machineId
         }]).select();
 
         if (!error && data) {
@@ -51,7 +54,7 @@ export default function AdminPanel({ session, onLogout, operators, setOperators,
     };
 
     const deleteOperator = async (id) => {
-        const { error } = await supabase.from('operators').delete().eq('id', id);
+        const { error } = await supabase.from('operators').delete().eq('id', id).eq('machine_id', machineId);
         if (!error) {
             setOperators(operators.filter(op => op.id !== id));
         } else {
@@ -60,7 +63,7 @@ export default function AdminPanel({ session, onLogout, operators, setOperators,
     };
 
     const addStopReason = async (reason) => {
-        const { data, error } = await supabase.from('stop_reasons').insert([{ reason }]).select();
+        const { data, error } = await supabase.from('stop_reasons').insert([{ reason, machine_id: machineId }]).select();
         if (!error && data) {
             setStopReasons([...stopReasons, reason]);
             return true;
@@ -70,7 +73,7 @@ export default function AdminPanel({ session, onLogout, operators, setOperators,
     };
 
     const deleteStopReason = async (reason) => {
-        const { error } = await supabase.from('stop_reasons').delete().eq('reason', reason);
+        const { error } = await supabase.from('stop_reasons').delete().eq('reason', reason).eq('machine_id', machineId);
         if (!error) {
             setStopReasons(stopReasons.filter(r => r !== reason));
         } else {
@@ -79,7 +82,7 @@ export default function AdminPanel({ session, onLogout, operators, setOperators,
     };
 
     const addErrorReason = async (reason) => {
-        const { data, error } = await supabase.from('error_reasons').insert([{ reason }]).select();
+        const { data, error } = await supabase.from('error_reasons').insert([{ reason, machine_id: machineId }]).select();
         if (!error && data) {
             setErrorReasons([...errorReasons, reason]);
             return true;
@@ -89,7 +92,7 @@ export default function AdminPanel({ session, onLogout, operators, setOperators,
     };
 
     const deleteErrorReason = async (reason) => {
-        const { error } = await supabase.from('error_reasons').delete().eq('reason', reason);
+        const { error } = await supabase.from('error_reasons').delete().eq('reason', reason).eq('machine_id', machineId);
         if (!error) {
             setErrorReasons(errorReasons.filter(r => r !== reason));
         } else {
@@ -101,7 +104,7 @@ export default function AdminPanel({ session, onLogout, operators, setOperators,
         <div className="bg-white p-8 rounded-2xl shadow-xl animate-fade-in w-full">
             {/* Header */}
             <div className="flex justify-between items-center mb-6 pb-4 border-b border-gray-200">
-                <h2 className="text-3xl font-bold text-gray-800">Admin Paneli</h2>
+                <h2 className="text-3xl font-bold text-gray-800">Admin Paneli (Makine: {machineId})</h2>
                 <div className="flex items-center gap-4">
                     <span className="text-sm text-gray-600">{session?.user?.email}</span>
                     <button
