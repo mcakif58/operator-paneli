@@ -506,7 +506,7 @@ function MainAppPanel({ currentUser, onLogout, startProduction, stopProduction, 
       const { data, error } = await supabase
         .from('hata_loglari')
         .select('*')
-        .eq('operator_id', currentUser.user_id)
+        .eq('operator_id', currentUser.id)
         .eq('machine_id', machineId)
         .order('created_at', { ascending: false })
         .limit(1);
