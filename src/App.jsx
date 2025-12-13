@@ -147,7 +147,7 @@ export default function App() {
 
   const logPartCount = async (count) => {
     const logData = {
-      operator_id: currentUser.card_id,
+      operator_id: currentUser.id,
       operator_name: currentUser.full_name,
       adet: parseInt(count),
       machine_id: machineId,
@@ -165,7 +165,7 @@ export default function App() {
 
   const logError = async (reason) => {
     const logData = {
-      operator_id: currentUser.card_id,
+      operator_id: currentUser.id,
       operator_name: currentUser.full_name,
       sebep: reason,
       machine_id: machineId,
@@ -182,7 +182,7 @@ export default function App() {
 
   const startProduction = async () => {
     const logData = {
-      operator_id: currentUser.card_id,
+      operator_id: currentUser.id,
       operator_name: currentUser.full_name,
       baslangic: new Date().toISOString(),
       bitis: null,
@@ -204,7 +204,7 @@ export default function App() {
       const { data: openSessions, error: fetchError } = await supabase
         .from('durus_loglari')
         .select('*')
-        .eq('operator_id', currentUser.user_id)
+        .eq('operator_id', currentUser.id)
         .eq('machine_id', machineId)
         .is('bitis', null)
         .order('baslangic', { ascending: false })
