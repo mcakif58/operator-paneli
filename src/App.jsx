@@ -51,23 +51,31 @@ export default function App() {
       }
 
       if (foundId) {
-        setMachineId(foundId);
-        // Fetch sirket_id (mapped from company_id) for this machine
-        const { data, error } = await supabase
-          .from('machines')
-          .select('company_id')
-          .eq('id', foundId)
-          .single();
-
-        if (data && !error) {
-          setSirketId(data.company_id);
+        // VALIDATION: Check if ID is numeric (BigInt compatible)
+        if (isNaN(foundId)) {
+          console.error("Invalid Machine ID (NaN):", foundId);
+          localStorage.removeItem('stored_machine_id');
+          // Clear URL params without reload if possible, otherwise it just ignores it next time because we don't set it
+          foundId = null;
         } else {
-          console.error("Machine details fetch error or no company_id", error);
-        }
+          setMachineId(foundId);
+          // Fetch sirket_id (mapped from company_id) for this machine
+          const { data, error } = await supabase
+            .from('machines')
+            .select('company_id')
+            .eq('id', foundId)
+            .single();
 
-        setIsLoadingMachine(false);
-        return;
-      }
+          if (data && !error) {
+            setSirketId(data.company_id);
+          } else {
+            console.error("Machine details fetch error or no company_id", error);
+          }
+
+          setIsLoadingMachine(false);
+          return;
+        }
+      } // Closing validation else block
 
       // C) Hiçbiri yoksa -> Makine Seçim Ekranı için listeyi çek
       console.log('Makine ID bulunamadı, seçim ekranı hazırlanıyor...');
