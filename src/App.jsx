@@ -1,5 +1,5 @@
 ﻿import React, { useState, useMemo, useEffect } from 'react';
-import { Database, User, Settings, AlertTriangle, Play, StopCircle, LogOut, CheckCircle, XCircle, Lock, Package, Pencil, Monitor, Cpu } from 'lucide-react';
+import { Database, User, Settings, AlertTriangle, Play, StopCircle, LogOut, CheckCircle, XCircle, Lock, Package, Pencil, Monitor, Cpu, ScanLine, KeyRound } from 'lucide-react';
 import { supabase } from './supabase';
 import AdminPanel from './AdminPanel';
 
@@ -16,6 +16,7 @@ export default function App() {
 
   // Makine Seçimi için State'ler
   const [machineId, setMachineId] = useState(null);
+  const [sirketId, setSirketId] = useState(null);
   const [availableMachines, setAvailableMachines] = useState([]);
   const [isLoadingMachine, setIsLoadingMachine] = useState(true);
 
@@ -29,22 +30,41 @@ export default function App() {
     const initMachine = async () => {
       setIsLoadingMachine(true);
 
+      let foundId = null;
+
       // A) URL Kontrolü (Öncelik #1 - Test için)
       const params = new URLSearchParams(window.location.search);
       const urlId = params.get('id');
 
       if (urlId) {
         console.log('Makine ID URLden alındı:', urlId);
-        setMachineId(urlId);
-        setIsLoadingMachine(false);
-        return;
+        foundId = urlId;
       }
 
       // B) LocalStorage Kontrolü (Öncelik #2 - Prodüksiyon için)
-      const storageId = localStorage.getItem('stored_machine_id');
-      if (storageId) {
-        console.log('Makine ID Hafızadan alındı:', storageId);
-        setMachineId(storageId);
+      if (!foundId) {
+        const storageId = localStorage.getItem('stored_machine_id');
+        if (storageId) {
+          console.log('Makine ID Hafızadan alındı:', storageId);
+          foundId = storageId;
+        }
+      }
+
+      if (foundId) {
+        setMachineId(foundId);
+        // Fetch sirket_id for this machine
+        const { data, error } = await supabase
+          .from('machines')
+          .select('sirket_id')
+          .eq('id', foundId)
+          .single();
+
+        if (data && !error) {
+          setSirketId(data.sirket_id);
+        } else {
+          console.error("Machine details fetch error or no sirket_id", error);
+        }
+
         setIsLoadingMachine(false);
         return;
       }
@@ -62,10 +82,13 @@ export default function App() {
   }, []);
 
   // Makine Seçim Ekranından seçim yapıldığında
-  const handleMachineSelect = (selectedId) => {
+  const handleMachineSelect = async (selectedId) => {
     localStorage.setItem('stored_machine_id', selectedId);
     setMachineId(selectedId);
-    // Sayfayı yenilemeye gerek yok, state değiştiği için UI güncellenecek
+
+    // Fetch sirket_id immediately
+    const { data } = await supabase.from('machines').select('sirket_id').eq('id', selectedId).single();
+    if (data) setSirketId(data.sirket_id);
   };
 
   // Makine değiştirmek için (Admin panelinden veya footer'dan)
@@ -126,7 +149,8 @@ export default function App() {
       operator_id: currentUser.user_id,
       operator_name: currentUser.name,
       adet: parseInt(count),
-      machine_id: machineId
+      machine_id: machineId,
+      sirket_id: sirketId
     };
 
     try {
@@ -143,7 +167,8 @@ export default function App() {
       operator_id: currentUser.user_id,
       operator_name: currentUser.name,
       sebep: reason,
-      machine_id: machineId
+      machine_id: machineId,
+      sirket_id: sirketId
     };
 
     try {
@@ -160,7 +185,8 @@ export default function App() {
       operator_name: currentUser.name,
       baslangic: new Date().toISOString(),
       bitis: null,
-      machine_id: machineId
+      machine_id: machineId,
+      sirket_id: sirketId
     };
 
     try {
@@ -211,9 +237,26 @@ export default function App() {
   // 4. EKRAN YÖNETİMİ
   // -------------------------------------------------------------------------
 
-  const handleOperatorLogin = (operator) => {
-    setCurrentUser(operator);
-    setCurrentPage('app');
+  const handleRFIDLogin = async (cardId) => {
+    try {
+      const { data, error } = await supabase
+        .from('operators')
+        .select('*')
+        .eq('card_id', cardId)
+        .eq('machine_id', machineId)
+        .single();
+
+      if (error || !data) {
+        alert('Kart Tanımsız! Lütfen yetkiliye başvurunuz.');
+        return;
+      }
+
+      setCurrentUser(data);
+      setCurrentPage('app');
+    } catch (err) {
+      console.error('Login error:', err);
+      alert('Giriş yapılırken hata oluştu.');
+    }
   };
 
   const handleLogout = () => {
@@ -294,6 +337,7 @@ export default function App() {
             errorReasons={errorReasons}
             setErrorReasons={setErrorReasons}
             machineId={machineId}
+            sirketId={sirketId}
           />
         );
       case 'adminLogin':
@@ -306,11 +350,10 @@ export default function App() {
       default:
         return (
           <div className="scale-[1.25] origin-center">
-            <OperatorSelectScreen
-              operators={operators}
-              onSelectOperator={handleOperatorLogin}
+            <RFIDLoginScreen
+              onLogin={handleRFIDLogin}
               onGoToAdmin={handleAdminLoginRequest}
-              onChangeMachine={handleChangeMachine} // Yeni özellik
+              onChangeMachine={handleChangeMachine}
             />
           </div>
         );
@@ -372,11 +415,40 @@ function MachineSelectionScreen({ machines, onSelect }) {
   );
 }
 
-// B) 1. Ekran: Operatör Seçimi
-function OperatorSelectScreen({ operators, onSelectOperator, onGoToAdmin, onChangeMachine }) {
+// B) 1. Ekran: RFID Login Ekranı (OperatorSelectScreen Yerine)
+function RFIDLoginScreen({ onLogin, onGoToAdmin, onChangeMachine }) {
+  const [buffer, setBuffer] = useState('');
+  const [lastKeyTime, setLastKeyTime] = useState(Date.now());
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const now = Date.now();
+
+      // Reset buffer if too much time passed between keystrokes (prevents random stray keys)
+      // 100ms is standard for barcode/rfid scanners acting as keyboards
+      if (now - lastKeyTime > 200) {
+        setBuffer('');
+      }
+      setLastKeyTime(now);
+
+      if (e.key === 'Enter') {
+        if (buffer.length > 0) {
+          onLogin(buffer);
+          setBuffer('');
+        }
+      } else if (e.key.length === 1) {
+        // Only printable characters
+        setBuffer(prev => prev + e.key);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [buffer, lastKeyTime, onLogin]);
+
   return (
-    <div className="bg-white p-6 rounded-2xl shadow-xl animate-fade-in relative">
-      {/* Makine Değiştir Butonu (Gizli köşe) */}
+    <div className="bg-white p-12 rounded-2xl shadow-xl animate-fade-in relative flex flex-col items-center justify-center max-w-lg w-full text-center">
+      {/* Makine Değiştir Butonu */}
       <button
         onClick={onChangeMachine}
         className="absolute top-4 right-4 p-2 text-gray-300 hover:text-red-500 transition-colors"
@@ -385,35 +457,30 @@ function OperatorSelectScreen({ operators, onSelectOperator, onGoToAdmin, onChan
         <Monitor size={16} />
       </button>
 
-      <h2 className="text-3xl font-bold text-center text-gray-800 mb-8">
-        Operatör Seçin
-      </h2>
-      <div className="grid grid-cols-1 gap-4">
-        {operators.length === 0 ? (
-          <div className="text-center text-gray-500 py-8 border-2 border-dashed border-gray-200 rounded-xl">
-            <p className="mb-2">Bu makine için tanımlı operatör yok.</p>
-            <p className="text-sm">Admin panelinden ekleyebilirsiniz.</p>
-          </div>
-        ) : (
-          operators.map((op) => (
-            <button
-              key={op.id}
-              onClick={() => onSelectOperator(op)}
-              className="flex items-center justify-center gap-4 p-6 bg-blue-600 text-white rounded-xl text-2xl font-semibold shadow-lg hover:bg-blue-700 transition-all duration-200 transform hover:scale-105"
-            >
-              <User size={30} />
-              {op.name}
-            </button>
-          ))
-        )}
+      <div className="mb-8 p-6 bg-blue-50 rounded-full animate-pulse">
+        <ScanLine size={80} className="text-blue-600" />
       </div>
-      <div className="mt-8 text-center">
+
+      <h2 className="text-3xl font-bold text-gray-800 mb-4">
+        Personel Girişi
+      </h2>
+      <p className="text-gray-500 text-lg mb-8">
+        Lütfen kişisel kartınızı okuyucuya okutunuz.
+      </p>
+
+      {/* Visual Indicator of "Looking for card" */}
+      <div className="px-6 py-2 bg-gray-100 rounded-full text-sm text-gray-400 font-mono mb-8 flex items-center gap-2">
+        <KeyRound size={16} />
+        Kart taranıyor...
+      </div>
+
+      <div className="mt-4 w-full">
         <button
           onClick={onGoToAdmin}
-          className="flex items-center justify-center gap-2 w-full p-4 bg-gray-700 text-white rounded-lg text-lg font-medium hover:bg-gray-800 transition-all duration-200"
+          className="flex items-center justify-center gap-2 w-full p-4 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg text-sm font-medium transition-all duration-200"
         >
-          <Settings size={20} />
-          Admin Paneli
+          <Settings size={16} />
+          Yönetici Girişi
         </button>
       </div>
     </div>

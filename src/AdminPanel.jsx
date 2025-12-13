@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, LogOut } from 'lucide-react';
 import { supabase } from './supabase';
 
-export default function AdminPanel({ session, onLogout, operators, setOperators, stopReasons, setStopReasons, errorReasons, setErrorReasons, machineId }) {
+export default function AdminPanel({ session, onLogout, operators, setOperators, stopReasons, setStopReasons, errorReasons, setErrorReasons, machineId, sirketId }) {
     const [activeTab, setActiveTab] = useState('operators');
 
     // Fetch data from Supabase on mount
@@ -42,7 +42,8 @@ export default function AdminPanel({ session, onLogout, operators, setOperators,
             name,
             role,
             user_id: user.id,
-            machine_id: machineId
+            machine_id: machineId,
+            sirket_id: sirketId
         }]).select();
 
         if (!error && data) {
@@ -63,7 +64,7 @@ export default function AdminPanel({ session, onLogout, operators, setOperators,
     };
 
     const addStopReason = async (reason) => {
-        const { data, error } = await supabase.from('stop_reasons').insert([{ reason, machine_id: machineId }]).select();
+        const { data, error } = await supabase.from('stop_reasons').insert([{ reason, machine_id: machineId, sirket_id: sirketId }]).select();
         if (!error && data) {
             setStopReasons([...stopReasons, reason]);
             return true;
@@ -82,7 +83,7 @@ export default function AdminPanel({ session, onLogout, operators, setOperators,
     };
 
     const addErrorReason = async (reason) => {
-        const { data, error } = await supabase.from('error_reasons').insert([{ reason, machine_id: machineId }]).select();
+        const { data, error } = await supabase.from('error_reasons').insert([{ reason, machine_id: machineId, sirket_id: sirketId }]).select();
         if (!error && data) {
             setErrorReasons([...errorReasons, reason]);
             return true;
