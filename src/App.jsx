@@ -150,7 +150,7 @@ export default function App() {
       operator_name: currentUser.full_name,
       adet: parseInt(count),
       machine_id: machineId,
-      company_id: sirketId
+      sirket_id: sirketId
     };
 
     try {
@@ -168,7 +168,7 @@ export default function App() {
       operator_name: currentUser.full_name,
       sebep: reason,
       machine_id: machineId,
-      company_id: sirketId
+      sirket_id: sirketId
     };
 
     try {
@@ -186,7 +186,7 @@ export default function App() {
       baslangic: new Date().toISOString(),
       bitis: null,
       machine_id: machineId,
-      company_id: sirketId
+      sirket_id: sirketId
     };
 
     try {
