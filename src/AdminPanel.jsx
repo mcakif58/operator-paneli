@@ -64,7 +64,7 @@ export default function AdminPanel({ session, onLogout, operators, setOperators,
     };
 
     const addStopReason = async (reason) => {
-        const { data, error } = await supabase.from('stop_reasons').insert([{ reason, machine_id: machineId, company_id: sirketId }]).select();
+        const { data, error } = await supabase.from('stop_reasons').insert([{ reason, machine_id: machineId, sirket_id: sirketId }]).select();
         if (!error && data) {
             setStopReasons([...stopReasons, reason]);
             return true;
@@ -83,7 +83,7 @@ export default function AdminPanel({ session, onLogout, operators, setOperators,
     };
 
     const addErrorReason = async (reason) => {
-        const { data, error } = await supabase.from('error_reasons').insert([{ reason, machine_id: machineId, company_id: sirketId }]).select();
+        const { data, error } = await supabase.from('error_reasons').insert([{ reason, machine_id: machineId, sirket_id: sirketId }]).select();
         if (!error && data) {
             setErrorReasons([...errorReasons, reason]);
             return true;
@@ -105,7 +105,7 @@ export default function AdminPanel({ session, onLogout, operators, setOperators,
         <div className="bg-white p-8 rounded-2xl shadow-xl animate-fade-in w-full">
             {/* Header */}
             <div className="flex justify-between items-center mb-6 pb-4 border-b border-gray-200">
-                <h2 className="text-3xl font-bold text-gray-800">Admin Paneli (Makine: {machineId})</h2>
+                <h2 className="text-3xl font-bold text-gray-800">Admin Paneli</h2>
                 <div className="flex items-center gap-4">
                     <span className="text-sm text-gray-600">{session?.user?.email}</span>
                     <button
@@ -180,78 +180,13 @@ export default function AdminPanel({ session, onLogout, operators, setOperators,
 }
 
 // Operators Tab Component
-function OperatorsTab({ operators, onAdd, onDelete }) {
-    const [showForm, setShowForm] = useState(false);
-    const [name, setName] = useState('');
-    const [role, setRole] = useState('Operatör');
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        const success = await onAdd(name, role);
-        if (success) {
-            setName('');
-            setRole('Operatör');
-            setShowForm(false);
-        }
-    };
-
+// Operators Tab Component (Read-Only)
+function OperatorsTab({ operators }) {
     return (
         <div>
             <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-bold text-gray-800">Operatör Listesi</h3>
-                <button
-                    onClick={() => setShowForm(!showForm)}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all"
-                >
-                    <Plus size={20} />
-                    Yeni Operatör
-                </button>
             </div>
-
-            {showForm && (
-                <div className="mb-6 p-6 bg-blue-50 rounded-lg">
-                    <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">İsim</label>
-                            <input
-                                type="text"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                required
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                placeholder="Ali Yılmaz"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Rol</label>
-                            <select
-                                value={role}
-                                onChange={(e) => setRole(e.target.value)}
-                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                            >
-                                <option>Operatör</option>
-                                <option>Vardiya Amiri</option>
-                                <option>Teknik Sorumlu</option>
-                            </select>
-                        </div>
-                        <div className="col-span-2 flex gap-2">
-                            <button
-                                type="submit"
-                                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                            >
-                                Ekle
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setShowForm(false)}
-                                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
-                            >
-                                İptal
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {operators.map((op) => (
@@ -260,12 +195,6 @@ function OperatorsTab({ operators, onAdd, onDelete }) {
                             <p className="font-semibold text-gray-800">{op.full_name}</p>
                             <p className="text-sm text-gray-600">{op.role}</p>
                         </div>
-                        <button
-                            onClick={() => onDelete(op.id)}
-                            className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-all"
-                        >
-                            <Trash2 size={18} />
-                        </button>
                     </div>
                 ))}
             </div>
