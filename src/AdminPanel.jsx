@@ -39,11 +39,11 @@ export default function AdminPanel({ session, onLogout, operators, setOperators,
         }
 
         const { data, error } = await supabase.from('operators').insert([{
-            name,
+            full_name: name,
             role,
             user_id: user.id,
             machine_id: machineId,
-            sirket_id: sirketId
+            company_id: sirketId
         }]).select();
 
         if (!error && data) {
@@ -64,7 +64,7 @@ export default function AdminPanel({ session, onLogout, operators, setOperators,
     };
 
     const addStopReason = async (reason) => {
-        const { data, error } = await supabase.from('stop_reasons').insert([{ reason, machine_id: machineId, sirket_id: sirketId }]).select();
+        const { data, error } = await supabase.from('stop_reasons').insert([{ reason, machine_id: machineId, company_id: sirketId }]).select();
         if (!error && data) {
             setStopReasons([...stopReasons, reason]);
             return true;
@@ -83,7 +83,7 @@ export default function AdminPanel({ session, onLogout, operators, setOperators,
     };
 
     const addErrorReason = async (reason) => {
-        const { data, error } = await supabase.from('error_reasons').insert([{ reason, machine_id: machineId, sirket_id: sirketId }]).select();
+        const { data, error } = await supabase.from('error_reasons').insert([{ reason, machine_id: machineId, company_id: sirketId }]).select();
         if (!error && data) {
             setErrorReasons([...errorReasons, reason]);
             return true;
@@ -257,7 +257,7 @@ function OperatorsTab({ operators, onAdd, onDelete }) {
                 {operators.map((op) => (
                     <div key={op.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                         <div>
-                            <p className="font-semibold text-gray-800">{op.name}</p>
+                            <p className="font-semibold text-gray-800">{op.full_name}</p>
                             <p className="text-sm text-gray-600">{op.role}</p>
                         </div>
                         <button

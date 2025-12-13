@@ -52,17 +52,17 @@ export default function App() {
 
       if (foundId) {
         setMachineId(foundId);
-        // Fetch sirket_id for this machine
+        // Fetch sirket_id (mapped from company_id) for this machine
         const { data, error } = await supabase
           .from('machines')
-          .select('sirket_id')
+          .select('company_id')
           .eq('id', foundId)
           .single();
 
         if (data && !error) {
-          setSirketId(data.sirket_id);
+          setSirketId(data.company_id);
         } else {
-          console.error("Machine details fetch error or no sirket_id", error);
+          console.error("Machine details fetch error or no company_id", error);
         }
 
         setIsLoadingMachine(false);
@@ -86,9 +86,9 @@ export default function App() {
     localStorage.setItem('stored_machine_id', selectedId);
     setMachineId(selectedId);
 
-    // Fetch sirket_id immediately
-    const { data } = await supabase.from('machines').select('sirket_id').eq('id', selectedId).single();
-    if (data) setSirketId(data.sirket_id);
+    // Fetch sirket_id (company_id) immediately
+    const { data } = await supabase.from('machines').select('company_id').eq('id', selectedId).single();
+    if (data) setSirketId(data.company_id);
   };
 
   // Makine değiştirmek için (Admin panelinden veya footer'dan)
@@ -147,10 +147,10 @@ export default function App() {
   const logPartCount = async (count) => {
     const logData = {
       operator_id: currentUser.user_id,
-      operator_name: currentUser.name,
+      operator_name: currentUser.full_name,
       adet: parseInt(count),
       machine_id: machineId,
-      sirket_id: sirketId
+      company_id: sirketId
     };
 
     try {
@@ -165,10 +165,10 @@ export default function App() {
   const logError = async (reason) => {
     const logData = {
       operator_id: currentUser.user_id,
-      operator_name: currentUser.name,
+      operator_name: currentUser.full_name,
       sebep: reason,
       machine_id: machineId,
-      sirket_id: sirketId
+      company_id: sirketId
     };
 
     try {
@@ -182,11 +182,11 @@ export default function App() {
   const startProduction = async () => {
     const logData = {
       operator_id: currentUser.user_id,
-      operator_name: currentUser.name,
+      operator_name: currentUser.full_name,
       baslangic: new Date().toISOString(),
       bitis: null,
       machine_id: machineId,
-      sirket_id: sirketId
+      company_id: sirketId
     };
 
     try {
@@ -404,7 +404,7 @@ function MachineSelectionScreen({ machines, onSelect }) {
               <Cpu className="text-gray-400 group-hover:text-blue-600" />
               <span className="font-bold text-lg text-gray-700 group-hover:text-blue-800">{machine.name}</span>
             </div>
-            <div className="px-3 py-1 bg-gray-200 text-xs font-mono rounded text-gray-600">ID: {machine.id}</div>
+            {/* <div className="px-3 py-1 bg-gray-200 text-xs font-mono rounded text-gray-600">ID: {machine.id}</div> */}
           </button>
         ))}
       </div>
@@ -575,9 +575,9 @@ function MainAppPanel({ currentUser, onLogout, startProduction, stopProduction, 
 
   const statusConfig = useMemo(() => {
     switch (machineState) {
-      case 'running': return { text: 'ÜRETİMDE (#' + machineId + ')', icon: <CheckCircle size={24} />, color: 'bg-green-100 text-green-800' };
-      case 'stopped': return { text: 'DURUŞTA (#' + machineId + ')', icon: <XCircle size={24} />, color: 'bg-red-100 text-red-800' };
-      default: return { text: 'BEKLEMEDE (#' + machineId + ')', icon: <Database size={24} />, color: 'bg-gray-200 text-gray-800' };
+      case 'running': return { text: 'ÜRETİMDE', icon: <CheckCircle size={24} />, color: 'bg-green-100 text-green-800' };
+      case 'stopped': return { text: 'DURUŞTA', icon: <XCircle size={24} />, color: 'bg-red-100 text-red-800' };
+      default: return { text: 'BEKLEMEDE', icon: <Database size={24} />, color: 'bg-gray-200 text-gray-800' };
     }
   }, [machineState, machineId]);
 
@@ -586,10 +586,10 @@ function MainAppPanel({ currentUser, onLogout, startProduction, stopProduction, 
       <div className="flex justify-between items-center mb-6 pb-4 border-b border-gray-200">
         <div>
           <span className="text-sm text-gray-500">Aktif Operatör</span>
-          <h3 className="text-xl font-bold text-gray-900">{currentUser.name}</h3>
+          <h3 className="text-xl font-bold text-gray-900">{currentUser.full_name}</h3>
         </div>
         <div className="flex items-center gap-2">
-          <span className="px-3 py-1 bg-gray-100 rounded text-xs font-mono text-gray-500">ID: {machineId}</span>
+          {/* Machine ID hidden as per user request */}
           <button onClick={onLogout} className="p-3 bg-gray-100 rounded-full text-gray-600 hover:bg-red-100 hover:text-red-600 transition-all"><LogOut size={20} /></button>
         </div>
       </div>
