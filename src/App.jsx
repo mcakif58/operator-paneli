@@ -68,306 +68,306 @@ export default function App() {
         setIsLoadingMachine(false);
         return;
       }
-    } // Closing validation else block
 
-    // C) Hiçbiri yoksa -> Makine Seçim Ekranı için listeyi çek
-    console.log('Makine ID bulunamadı, seçim ekranı hazırlanıyor...');
-    const { data, error } = await supabase.from('machines').select('*').order('id');
-    if (data && !error) {
-      setAvailableMachines(data);
-    }
-    setIsLoadingMachine(false);
+
+      // C) Hiçbiri yoksa -> Makine Seçim Ekranı için listeyi çek
+      console.log('Makine ID bulunamadı, seçim ekranı hazırlanıyor...');
+      const { data, error } = await supabase.from('machines').select('*').order('id');
+      if (data && !error) {
+        setAvailableMachines(data);
+      }
+      setIsLoadingMachine(false);
+    };
+
+    initMachine();
+  }, []);
+
+  // Makine Seçim Ekranından seçim yapıldığında
+  const handleMachineSelect = async (selectedId) => {
+    localStorage.setItem('stored_machine_id', selectedId);
+    setMachineId(selectedId);
+
+    // Fetch sirket_id (company_id) immediately
+    const { data } = await supabase.from('machines').select('company_id').eq('id', selectedId).single();
+    if (data) setSirketId(data.company_id);
   };
 
-  initMachine();
-}, []);
-
-// Makine Seçim Ekranından seçim yapıldığında
-const handleMachineSelect = async (selectedId) => {
-  localStorage.setItem('stored_machine_id', selectedId);
-  setMachineId(selectedId);
-
-  // Fetch sirket_id (company_id) immediately
-  const { data } = await supabase.from('machines').select('company_id').eq('id', selectedId).single();
-  if (data) setSirketId(data.company_id);
-};
-
-// Makine değiştirmek için (Admin panelinden veya footer'dan)
-const handleChangeMachine = () => {
-  if (window.confirm("Bu cihazın makine ayarını sıfırlamak istiyor musunuz?")) {
-    localStorage.removeItem('stored_machine_id');
-    window.location.search = ''; // URL parametrelerini de temizle
-  }
-};
+  // Makine değiştirmek için (Admin panelinden veya footer'dan)
+  const handleChangeMachine = () => {
+    if (window.confirm("Bu cihazın makine ayarını sıfırlamak istiyor musunuz?")) {
+      localStorage.removeItem('stored_machine_id');
+      window.location.search = ''; // URL parametrelerini de temizle
+    }
+  };
 
 
-// -------------------------------------------------------------------------
-// 2. VERİ ÇEKME (Data Fetching)
-// -------------------------------------------------------------------------
-useEffect(() => {
-  if (!machineId) return; // ID yoksa veri çekme
+  // -------------------------------------------------------------------------
+  // 2. VERİ ÇEKME (Data Fetching)
+  // -------------------------------------------------------------------------
+  useEffect(() => {
+    if (!machineId) return; // ID yoksa veri çekme
 
-  const fetchData = async () => {
+    const fetchData = async () => {
+      try {
+        // Fetch operators (Machine Isolated)
+        const { data: operatorsData, error: operatorsError } = await supabase
+          .from('operators')
+          .select('*')
+          .eq('machine_id', machineId)
+          .order('id');
+        if (!operatorsError && operatorsData) setOperators(operatorsData);
+
+        // Fetch stop reasons (Machine Isolated)
+        const { data: stopReasonsData, error: stopReasonsError } = await supabase
+          .from('stop_reasons')
+          .select('*')
+          .eq('machine_id', machineId)
+          .order('id');
+        if (!stopReasonsError && stopReasonsData) setStopReasons(stopReasonsData.map(r => r.reason));
+
+        // Fetch error reasons (Machine Isolated)
+        const { data: errorReasonsData, error: errorReasonsError } = await supabase
+          .from('error_reasons')
+          .select('*')
+          .eq('machine_id', machineId)
+          .order('id');
+        if (!errorReasonsError && errorReasonsData) setErrorReasons(errorReasonsData.map(r => r.reason));
+
+      } catch (error) {
+        console.error('Unexpected error fetching data:', error);
+      }
+    };
+
+    fetchData();
+  }, [machineId]);
+
+  // -------------------------------------------------------------------------
+  // 3. LOGLAMA FONKSİYONLARI
+  // -------------------------------------------------------------------------
+
+  const logPartCount = async (count) => {
+    const logData = {
+      operator_id: currentUser.card_id,
+      operator_name: currentUser.full_name,
+      adet: parseInt(count),
+      machine_id: machineId,
+      sirket_id: sirketId
+    };
+
     try {
-      // Fetch operators (Machine Isolated)
-      const { data: operatorsData, error: operatorsError } = await supabase
-        .from('operators')
-        .select('*')
-        .eq('machine_id', machineId)
-        .order('id');
-      if (!operatorsError && operatorsData) setOperators(operatorsData);
+      const { error } = await supabase.from('sorunsuz_parca_loglari').insert([logData]);
+      if (error) throw error;
+      console.log('Parça sayısı kaydedildi:', count);
+    } catch (error) {
+      alert('Hata: ' + error.message);
+    }
+  };
 
-      // Fetch stop reasons (Machine Isolated)
-      const { data: stopReasonsData, error: stopReasonsError } = await supabase
-        .from('stop_reasons')
-        .select('*')
-        .eq('machine_id', machineId)
-        .order('id');
-      if (!stopReasonsError && stopReasonsData) setStopReasons(stopReasonsData.map(r => r.reason));
+  const logError = async (reason) => {
+    const logData = {
+      operator_id: currentUser.card_id,
+      operator_name: currentUser.full_name,
+      sebep: reason,
+      machine_id: machineId,
+      sirket_id: sirketId
+    };
 
-      // Fetch error reasons (Machine Isolated)
-      const { data: errorReasonsData, error: errorReasonsError } = await supabase
-        .from('error_reasons')
+    try {
+      const { error } = await supabase.from('hata_loglari').insert([logData]);
+      if (error) throw error;
+    } catch (error) {
+      alert('Hata: ' + error.message);
+    }
+  };
+
+  const startProduction = async () => {
+    const logData = {
+      operator_id: currentUser.card_id,
+      operator_name: currentUser.full_name,
+      baslangic: new Date().toISOString(),
+      bitis: null,
+      machine_id: machineId,
+      sirket_id: sirketId
+    };
+
+    try {
+      const { data, error } = await supabase.from('durus_loglari').insert([logData]).select();
+      if (error) throw error;
+    } catch (error) {
+      alert('Başlatma hatası: ' + error.message);
+    }
+  };
+
+  const stopProduction = async (reason) => {
+    try {
+      // SADECE BU MAKİNE VE BU OPERATÖR İÇİN AÇIK OTURUMU BUL
+      const { data: openSessions, error: fetchError } = await supabase
+        .from('durus_loglari')
         .select('*')
+        .eq('operator_id', currentUser.user_id)
         .eq('machine_id', machineId)
-        .order('id');
-      if (!errorReasonsError && errorReasonsData) setErrorReasons(errorReasonsData.map(r => r.reason));
+        .is('bitis', null)
+        .order('baslangic', { ascending: false })
+        .limit(1);
+
+      if (fetchError) throw fetchError;
+
+      if (!openSessions || openSessions.length === 0) {
+        alert('Şu anda açık bir üretim kaydı görünmüyor.');
+        return;
+      }
+
+      const sessionToClose = openSessions[0];
+
+      const { error: updateError } = await supabase
+        .from('durus_loglari')
+        .update({
+          bitis: new Date().toISOString(),
+          sebep: reason
+        })
+        .eq('id', sessionToClose.id);
+
+      if (updateError) throw updateError;
 
     } catch (error) {
-      console.error('Unexpected error fetching data:', error);
+      alert('Durdurma hatası: ' + error.message);
     }
   };
 
-  fetchData();
-}, [machineId]);
+  // -------------------------------------------------------------------------
+  // 4. EKRAN YÖNETİMİ
+  // -------------------------------------------------------------------------
 
-// -------------------------------------------------------------------------
-// 3. LOGLAMA FONKSİYONLARI
-// -------------------------------------------------------------------------
+  const handleRFIDLogin = async (cardId) => {
+    try {
+      const { data, error } = await supabase
+        .from('operators')
+        .select('*')
+        .eq('card_id', cardId)
+        .eq('machine_id', machineId)
+        .single();
 
-const logPartCount = async (count) => {
-  const logData = {
-    operator_id: currentUser.card_id,
-    operator_name: currentUser.full_name,
-    adet: parseInt(count),
-    machine_id: machineId,
-    sirket_id: sirketId
-  };
+      if (error || !data) {
+        alert('Kart Tanımsız! Lütfen yetkiliye başvurunuz.');
+        return;
+      }
 
-  try {
-    const { error } = await supabase.from('sorunsuz_parca_loglari').insert([logData]);
-    if (error) throw error;
-    console.log('Parça sayısı kaydedildi:', count);
-  } catch (error) {
-    alert('Hata: ' + error.message);
-  }
-};
-
-const logError = async (reason) => {
-  const logData = {
-    operator_id: currentUser.card_id,
-    operator_name: currentUser.full_name,
-    sebep: reason,
-    machine_id: machineId,
-    sirket_id: sirketId
-  };
-
-  try {
-    const { error } = await supabase.from('hata_loglari').insert([logData]);
-    if (error) throw error;
-  } catch (error) {
-    alert('Hata: ' + error.message);
-  }
-};
-
-const startProduction = async () => {
-  const logData = {
-    operator_id: currentUser.card_id,
-    operator_name: currentUser.full_name,
-    baslangic: new Date().toISOString(),
-    bitis: null,
-    machine_id: machineId,
-    sirket_id: sirketId
-  };
-
-  try {
-    const { data, error } = await supabase.from('durus_loglari').insert([logData]).select();
-    if (error) throw error;
-  } catch (error) {
-    alert('Başlatma hatası: ' + error.message);
-  }
-};
-
-const stopProduction = async (reason) => {
-  try {
-    // SADECE BU MAKİNE VE BU OPERATÖR İÇİN AÇIK OTURUMU BUL
-    const { data: openSessions, error: fetchError } = await supabase
-      .from('durus_loglari')
-      .select('*')
-      .eq('operator_id', currentUser.user_id)
-      .eq('machine_id', machineId)
-      .is('bitis', null)
-      .order('baslangic', { ascending: false })
-      .limit(1);
-
-    if (fetchError) throw fetchError;
-
-    if (!openSessions || openSessions.length === 0) {
-      alert('Şu anda açık bir üretim kaydı görünmüyor.');
-      return;
+      setCurrentUser(data);
+      setCurrentPage('app');
+    } catch (err) {
+      console.error('Login error:', err);
+      alert('Giriş yapılırken hata oluştu.');
     }
+  };
 
-    const sessionToClose = openSessions[0];
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setMachineState('idle');
+    setCurrentPage('login');
+  };
 
-    const { error: updateError } = await supabase
-      .from('durus_loglari')
-      .update({
-        bitis: new Date().toISOString(),
-        sebep: reason
-      })
-      .eq('id', sessionToClose.id);
+  const handleAdminLoginRequest = () => setCurrentPage('adminLogin');
 
-    if (updateError) throw updateError;
-
-  } catch (error) {
-    alert('Durdurma hatası: ' + error.message);
-  }
-};
-
-// -------------------------------------------------------------------------
-// 4. EKRAN YÖNETİMİ
-// -------------------------------------------------------------------------
-
-const handleRFIDLogin = async (cardId) => {
-  try {
-    const { data, error } = await supabase
-      .from('operators')
-      .select('*')
-      .eq('card_id', cardId)
-      .eq('machine_id', machineId)
-      .single();
-
-    if (error || !data) {
-      alert('Kart Tanımsız! Lütfen yetkiliye başvurunuz.');
-      return;
+  const handleAdminLogin = async (email, password) => {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      alert('Giriş hatası: ' + error.message);
+      return false;
     }
-
-    setCurrentUser(data);
-    setCurrentPage('app');
-  } catch (err) {
-    console.error('Login error:', err);
-    alert('Giriş yapılırken hata oluştu.');
-  }
-};
-
-const handleLogout = () => {
-  setCurrentUser(null);
-  setMachineState('idle');
-  setCurrentPage('login');
-};
-
-const handleAdminLoginRequest = () => setCurrentPage('adminLogin');
-
-const handleAdminLogin = async (email, password) => {
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) {
-    alert('Giriş hatası: ' + error.message);
+    if (data.session) {
+      setAdminSession(data.session);
+      setCurrentPage('admin');
+      return true;
+    }
     return false;
+  };
+
+  const handleAdminLogout = async () => {
+    await supabase.auth.signOut();
+    setAdminSession(null);
+    setCurrentPage('login');
+  };
+
+  // LOADING MACHINE
+  if (isLoadingMachine) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="text-xl font-semibold text-gray-600 animate-pulse">Makine bilgileri yükleniyor...</div>
+      </div>
+    );
   }
-  if (data.session) {
-    setAdminSession(data.session);
-    setCurrentPage('admin');
-    return true;
+
+  // EĞER MAKİNE SEÇİLİ DEĞİLSE -> SEÇİM EKRANI (FALLBACK SCAN)
+  if (!machineId) {
+    return (
+      <MachineSelectionScreen
+        machines={availableMachines}
+        onSelect={handleMachineSelect}
+      />
+    );
   }
-  return false;
-};
 
-const handleAdminLogout = async () => {
-  await supabase.auth.signOut();
-  setAdminSession(null);
-  setCurrentPage('login');
-};
-
-// LOADING MACHINE
-if (isLoadingMachine) {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-xl font-semibold text-gray-600 animate-pulse">Makine bilgileri yükleniyor...</div>
-    </div>
-  );
-}
-
-// EĞER MAKİNE SEÇİLİ DEĞİLSE -> SEÇİM EKRANI (FALLBACK SCAN)
-if (!machineId) {
-  return (
-    <MachineSelectionScreen
-      machines={availableMachines}
-      onSelect={handleMachineSelect}
-    />
-  );
-}
-
-// --- ANA RENDER ---
-const renderPage = () => {
-  switch (currentPage) {
-    case 'app':
-      return (
-        <MainAppPanel
-          currentUser={currentUser}
-          onLogout={handleLogout}
-          startProduction={startProduction}
-          stopProduction={stopProduction}
-          logError={logError}
-          logPartCount={logPartCount}
-          machineState={machineState}
-          setMachineState={setMachineState}
-          stopReasons={stopReasons}
-          errorReasons={errorReasons}
-          machineId={machineId}
-        />
-      );
-    case 'admin':
-      return (
-        <AdminPanel
-          session={adminSession}
-          onLogout={handleAdminLogout}
-          operators={operators}
-          setOperators={setOperators}
-          stopReasons={stopReasons}
-          setStopReasons={setStopReasons}
-          errorReasons={errorReasons}
-          setErrorReasons={setErrorReasons}
-          machineId={machineId}
-          sirketId={sirketId}
-        />
-      );
-    case 'adminLogin':
-      return (
-        <div className="scale-[1.25] origin-center">
-          <AdminLoginScreen onLogin={handleAdminLogin} onBack={() => setCurrentPage('login')} />
-        </div>
-      );
-    case 'login':
-    default:
-      return (
-        <div className="scale-[1.25] origin-center">
-          <RFIDLoginScreen
-            onLogin={handleRFIDLogin}
-            onGoToAdmin={handleAdminLoginRequest}
-            onChangeMachine={handleChangeMachine}
+  // --- ANA RENDER ---
+  const renderPage = () => {
+    switch (currentPage) {
+      case 'app':
+        return (
+          <MainAppPanel
+            currentUser={currentUser}
+            onLogout={handleLogout}
+            startProduction={startProduction}
+            stopProduction={stopProduction}
+            logError={logError}
+            logPartCount={logPartCount}
+            machineState={machineState}
+            setMachineState={setMachineState}
+            stopReasons={stopReasons}
+            errorReasons={errorReasons}
+            machineId={machineId}
           />
-        </div>
-      );
-  }
-};
+        );
+      case 'admin':
+        return (
+          <AdminPanel
+            session={adminSession}
+            onLogout={handleAdminLogout}
+            operators={operators}
+            setOperators={setOperators}
+            stopReasons={stopReasons}
+            setStopReasons={setStopReasons}
+            errorReasons={errorReasons}
+            setErrorReasons={setErrorReasons}
+            machineId={machineId}
+            sirketId={sirketId}
+          />
+        );
+      case 'adminLogin':
+        return (
+          <div className="scale-[1.25] origin-center">
+            <AdminLoginScreen onLogin={handleAdminLogin} onBack={() => setCurrentPage('login')} />
+          </div>
+        );
+      case 'login':
+      default:
+        return (
+          <div className="scale-[1.25] origin-center">
+            <RFIDLoginScreen
+              onLogin={handleRFIDLogin}
+              onGoToAdmin={handleAdminLoginRequest}
+              onChangeMachine={handleChangeMachine}
+            />
+          </div>
+        );
+    }
+  };
 
-return (
-  <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-    <div className="w-full max-w-4xl flex justify-center">
-      {renderPage()}
+  return (
+    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+      <div className="w-full max-w-4xl flex justify-center">
+        {renderPage()}
+      </div>
     </div>
-  </div>
-);
+  );
 }
 
 // -------------------------------------------------------------------------
