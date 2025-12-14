@@ -420,9 +420,15 @@ function MachineSelectionScreen({ machines, onSelect }) {
 function RFIDLoginScreen({ onLogin, onGoToAdmin, onChangeMachine }) {
   const [buffer, setBuffer] = useState('');
   const [lastKeyTime, setLastKeyTime] = useState(Date.now());
+  const [manualId, setManualId] = useState(''); // Test için manuel giriş
 
   useEffect(() => {
     const handleKeyDown = (e) => {
+      // Eğer focus bir input üzerindeyse, global tarayıcı dinleyicisini çalıştırma
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+        return;
+      }
+
       const now = Date.now();
 
       // Reset buffer if too much time passed between keystrokes (prevents random stray keys)
@@ -447,6 +453,13 @@ function RFIDLoginScreen({ onLogin, onGoToAdmin, onChangeMachine }) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [buffer, lastKeyTime, onLogin]);
 
+  const handleManualSubmit = (e) => {
+    e.preventDefault();
+    if (manualId.trim()) {
+      onLogin(manualId.trim());
+    }
+  };
+
   return (
     <div className="bg-white p-12 rounded-2xl shadow-xl animate-fade-in relative flex flex-col items-center justify-center max-w-lg w-full text-center">
       {/* Makine Değiştir Butonu */}
@@ -454,6 +467,7 @@ function RFIDLoginScreen({ onLogin, onGoToAdmin, onChangeMachine }) {
         onClick={onChangeMachine}
         className="absolute top-4 right-4 p-2 text-gray-300 hover:text-red-500 transition-colors"
         title="Makine Ayarını Sıfırla"
+        tabIndex="-1"
       >
         <Monitor size={16} />
       </button>
@@ -475,7 +489,28 @@ function RFIDLoginScreen({ onLogin, onGoToAdmin, onChangeMachine }) {
         Kart taranıyor...
       </div>
 
-      <div className="mt-4 w-full">
+      {/* Manuel Test Girişi */}
+      <form onSubmit={handleManualSubmit} className="w-full mb-8 pt-4 border-t border-gray-100">
+        <p className="text-xs text-gray-400 mb-2 font-semibold uppercase tracking-wider">Test İçin Manuel Giriş</p>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={manualId}
+            onChange={(e) => setManualId(e.target.value)}
+            placeholder="Kart ID Giriniz..."
+            className="flex-1 p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+          />
+          <button
+            type="submit"
+            disabled={!manualId.trim()}
+            className="px-4 py-2 bg-gray-800 text-white rounded-lg text-sm font-semibold hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Giriş
+          </button>
+        </div>
+      </form>
+
+      <div className="w-full">
         <button
           onClick={onGoToAdmin}
           className="flex items-center justify-center gap-2 w-full p-4 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg text-sm font-medium transition-all duration-200"
