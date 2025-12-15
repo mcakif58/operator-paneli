@@ -626,7 +626,17 @@ function MainAppPanel({ currentUser, onLogout, startProduction, stopProduction, 
         </div>
         <div className="flex items-center gap-2">
           {/* Machine ID hidden as per user request */}
-          <button onClick={onLogout} className="p-3 bg-gray-100 rounded-full text-gray-600 hover:bg-red-100 hover:text-red-600 transition-all"><LogOut size={20} /></button>
+          <button
+            onClick={machineState === 'running' ? undefined : onLogout}
+            disabled={machineState === 'running'}
+            className={`p-3 rounded-full transition-all ${machineState === 'running'
+                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                : 'bg-gray-100 text-gray-600 hover:bg-red-100 hover:text-red-600'
+              }`}
+            title={machineState === 'running' ? "Makine çalışırken çıkış yapılamaz" : "Çıkış Yap"}
+          >
+            <LogOut size={20} />
+          </button>
         </div>
       </div>
 
