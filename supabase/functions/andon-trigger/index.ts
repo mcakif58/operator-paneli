@@ -131,14 +131,25 @@ serve(async (req) => {
         if (logError) throw logError
 
         // 4. Send Telegram Message
-        const messageText = `🚨 *ANDON UYARISI* 🚨
-    
-📍 *Makine:* ${machineName}
-👤 *Operatör:* ${operatorName}
-⚠️ *Tip:* ${type === 'MAINTENANCE' ? 'BAKIM' : 'MALZEME'}
-⏰ *Saat:* ${new Date().toLocaleTimeString('tr-TR')}
+        let messageText = ''
 
-Lütfen müdahale ediniz.`
+        if (type === 'MAINTENANCE') {
+            messageText = `🔴 🔴 *ACİL BAKIM ÇAĞRISI* 🔴 🔴
+    
+🏭 *Makine:* ${machineName}
+👤 *Operatör:* ${operatorName}
+🕒 *Saat:* ${new Date().toLocaleTimeString('tr-TR')}
+
+🛠️ _Lütfen en kısa sürede müdahale ediniz._`
+        } else {
+            messageText = `📦 📦 *MALZEME TALEBİ* 📦 📦
+    
+🏭 *Makine:* ${machineName}
+👤 *Operatör:* ${operatorName}
+🕒 *Saat:* ${new Date().toLocaleTimeString('tr-TR')}
+
+🚚 _Depo sorumlusunun dikkatine._`
+        }
 
         const telegramres = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
             method: 'POST',
