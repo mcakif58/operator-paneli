@@ -253,6 +253,24 @@ export default function App() {
       }
 
       setCurrentUser(data);
+
+      // SADECE BU AŞAMADA: Veritabanından açık oturum (Active Session) var mı kontrol et
+      // Bu sayede refresh atılsa bile login olurken state veritabanından 'running' olarak geri yüklenir.
+      const { data: activeSession } = await supabase
+        .from('durus_loglari')
+        .select('id')
+        .eq('operator_id', data.id)
+        .eq('machine_id', machineId)
+        .is('bitis', null) // Bitiş zamanı olmayan (hala açık) kayıt var mı?
+        .limit(1);
+
+      if (activeSession && activeSession.length > 0) {
+        console.log('Açık oturum bulundu, durum Running olarak geri yükleniyor.');
+        setMachineState('running');
+      } else {
+        setMachineState('idle');
+      }
+
       setCurrentPage('app');
     } catch (err) {
       console.error('Login error:', err);
@@ -630,8 +648,8 @@ function MainAppPanel({ currentUser, onLogout, startProduction, stopProduction, 
             onClick={machineState === 'running' ? undefined : onLogout}
             disabled={machineState === 'running'}
             className={`p-3 rounded-full transition-all ${machineState === 'running'
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                : 'bg-gray-100 text-gray-600 hover:bg-red-100 hover:text-red-600'
+              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+              : 'bg-gray-100 text-gray-600 hover:bg-red-100 hover:text-red-600'
               }`}
             title={machineState === 'running' ? "Makine çalışırken çıkış yapılamaz" : "Çıkış Yap"}
           >
