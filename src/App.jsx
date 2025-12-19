@@ -283,7 +283,7 @@ export default function App() {
         console.log('Parça sayısı kaydedildi:', count);
       } else {
         await NetworkManager.addToQueue('sorunsuz_parca_loglari', 'INSERT', logData);
-        alert('İnternet yok. Veri hafızaya alındı, bağlanınca gönderilecek.');
+        console.log('Offline: Parça sayısı kuyruğa eklendi.');
       }
     } catch (error) {
       alert('Hata: ' + error.message);
@@ -305,7 +305,7 @@ export default function App() {
         if (error) throw error;
       } else {
         await NetworkManager.addToQueue('hata_loglari', 'INSERT', logData);
-        alert('İnternet yok. Hata kaydı sıraya eklendi.');
+        console.log('Offline: Hata kaydı kuyruğa eklendi.');
       }
     } catch (error) {
       alert('Hata: ' + error.message);
