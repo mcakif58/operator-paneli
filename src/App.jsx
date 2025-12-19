@@ -1,4 +1,5 @@
-﻿import React, { useState, useMemo, useEffect } from 'react';
+﻿
+import React, { useState, useMemo, useEffect } from 'react';
 import { Database, User, Settings, AlertTriangle, Play, StopCircle, LogOut, CheckCircle, XCircle, Lock, Package, Pencil, Monitor, Cpu, ScanLine, KeyRound, Wrench, Box } from 'lucide-react';
 import { supabase } from './supabase';
 import AdminPanel from './AdminPanel';
@@ -19,6 +20,9 @@ export default function App() {
   const [sirketId, setSirketId] = useState(null);
   const [availableMachines, setAvailableMachines] = useState([]);
   const [isLoadingMachine, setIsLoadingMachine] = useState(true);
+
+  // NEW: Andon State (Lifted to App Level)
+  const [activeAndon, setActiveAndon] = useState(null);
 
   // İYİLEŞTİRME: Makine durumunu (state) ana bileşene taşıdık.
   const [machineState, setMachineState] = useState('idle'); // 'idle', 'running', 'stopped'
@@ -140,6 +144,86 @@ export default function App() {
 
     fetchData();
   }, [machineId]);
+
+  // ANDON SYSTEM LOGIC (LIFTED)
+  // Fetch initial status and subscribe to realtime
+  useEffect(() => {
+    if (!machineId) return;
+
+    const fetchAndon = async () => {
+      const { data } = await supabase
+        .from('andon_loglari')
+        .select('*')
+        .eq('machine_id', machineId)
+        .neq('status', 'RESOLVED')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      if (data) setActiveAndon(data);
+    };
+    fetchAndon();
+
+    const subscription = supabase
+      .channel('andon_realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'andon_loglari', filter: `machine_id=eq.${machineId}` },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            if (payload.new.status !== 'RESOLVED') setActiveAndon(payload.new);
+          } else if (payload.eventType === 'UPDATE') {
+            if (payload.new.status === 'RESOLVED') setActiveAndon(null);
+            else setActiveAndon(payload.new);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(subscription); };
+  }, [machineId]);
+
+  const triggerAndon = async (type) => {
+    try {
+      // 1. Get machine name
+      const { data: mData } = await supabase.from('machines').select('name, company_id').eq('id', machineId).single();
+
+      // 2. Call Edge Function
+      const { data, error } = await supabase.functions.invoke('andon-trigger', {
+        body: {
+          machineId: machineId,
+          operatorId: currentUser.id,
+          operatorName: currentUser.full_name,
+          type: type,
+          sirketId: mData.company_id,
+          machineName: mData.name
+        }
+      });
+
+      if (error) throw error;
+
+    } catch (err) {
+      console.error('Andon Error:', err);
+      let message = err.message;
+      if (err.context && err.context.json) {
+        try {
+          const detail = await err.context.json();
+          if (detail.error) message = detail.error;
+        } catch (e) { /* ignore json parse error */ }
+      }
+      alert('Andon Hatası: ' + message);
+    }
+  };
+
+  const resolveAndon = async () => {
+    if (!activeAndon) return;
+    try {
+      await supabase.from('andon_loglari').update({ status: 'RESOLVED', resolved_at: new Date().toISOString() }).eq('id', activeAndon.id);
+      setActiveAndon(null);
+    } catch (err) {
+      alert('Kapatma hatası: ' + err.message);
+    }
+  };
+
 
   // -------------------------------------------------------------------------
   // 3. LOGLAMA FONKSİYONLARI
@@ -342,6 +426,10 @@ export default function App() {
             stopReasons={stopReasons}
             errorReasons={errorReasons}
             machineId={machineId}
+            // Pass Andon Props
+            activeAndon={activeAndon}
+            triggerAndon={triggerAndon}
+            resolveAndon={resolveAndon}
           />
         );
       case 'admin':
@@ -384,6 +472,30 @@ export default function App() {
       <div className="w-full max-w-4xl flex justify-center">
         {renderPage()}
       </div>
+
+      {/* GLOBAL FLOATING ANDON BUTTONS (Outside of renderPage, so no Transform Parent Issues) */}
+      {/* Only show when logged in (currentUser exists) and on app page, and no active Andon */}
+      {currentUser && currentPage === 'app' && !activeAndon && (
+        <div className="fixed bottom-6 right-6 flex flex-col gap-4 z-[9999]">
+          <button
+            onClick={() => triggerAndon('MATERIAL')}
+            className="w-32 h-32 flex flex-col items-center justify-center bg-blue-600 text-white shadow-2xl rounded-2xl border-4 border-white hover:bg-blue-700 hover:scale-105 transition-all transform hover:-translate-y-1"
+          >
+            <Box size={40} className="mb-2" />
+            <span className="font-bold text-sm">MALZEME</span>
+            <span className="font-bold text-sm">İSTE</span>
+          </button>
+
+          <button
+            onClick={() => triggerAndon('MAINTENANCE')}
+            className="w-32 h-32 flex flex-col items-center justify-center bg-red-600 text-white shadow-2xl rounded-2xl border-4 border-white hover:bg-red-700 hover:scale-105 transition-all transform hover:-translate-y-1"
+          >
+            <Wrench size={40} className="mb-2" />
+            <span className="font-bold text-sm">BAKIMCI</span>
+            <span className="font-bold text-sm">ÇAĞIR</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -423,7 +535,6 @@ function MachineSelectionScreen({ machines, onSelect }) {
               <Cpu className="text-gray-400 group-hover:text-blue-600" />
               <span className="font-bold text-lg text-gray-700 group-hover:text-blue-800">{machine.name}</span>
             </div>
-            {/* <div className="px-3 py-1 bg-gray-200 text-xs font-mono rounded text-gray-600">ID: {machine.id}</div> */}
           </button>
         ))}
       </div>
@@ -542,7 +653,12 @@ function RFIDLoginScreen({ onLogin, onGoToAdmin, onChangeMachine }) {
 }
 
 // C) 2. Ekran: Ana Operatör Paneli
-function MainAppPanel({ currentUser, onLogout, startProduction, stopProduction, logError, logPartCount, machineState, setMachineState, stopReasons, errorReasons, machineId }) {
+function MainAppPanel({
+  currentUser, onLogout, startProduction, stopProduction, logError, logPartCount,
+  machineState, setMachineState, stopReasons, errorReasons, machineId,
+  // Props from App
+  activeAndon, triggerAndon, resolveAndon
+}) {
 
   const [isStopModalOpen, setStopModalOpen] = useState(false);
   const [isErrorModalOpen, setErrorModalOpen] = useState(false);
@@ -552,9 +668,6 @@ function MainAppPanel({ currentUser, onLogout, startProduction, stopProduction, 
   const [lastError, setLastError] = useState(null);
   const [isCorrectionModalOpen, setCorrectionModalOpen] = useState(false);
   const [canEditError, setCanEditError] = useState(false);
-
-  // NEW: Andon State
-  const [activeAndon, setActiveAndon] = useState(null);
 
   // Son hatayı getir
   const fetchLastError = async () => {
@@ -591,83 +704,6 @@ function MainAppPanel({ currentUser, onLogout, startProduction, stopProduction, 
     const now = new Date().getTime();
     const diffMinutes = (now - errorTime) / (1000 * 60);
     setCanEditError(diffMinutes <= 5);
-  };
-
-  // ANDON: Fetch initial status and subscribe to realtime
-  useEffect(() => {
-    const fetchAndon = async () => {
-      const { data } = await supabase
-        .from('andon_loglari')
-        .select('*')
-        .eq('machine_id', machineId)
-        .neq('status', 'RESOLVED')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-      if (data) setActiveAndon(data);
-    };
-    fetchAndon();
-
-    const subscription = supabase
-      .channel('andon_realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'andon_loglari', filter: `machine_id=eq.${machineId}` },
-        (payload) => {
-          if (payload.eventType === 'INSERT') {
-            if (payload.new.status !== 'RESOLVED') setActiveAndon(payload.new);
-          } else if (payload.eventType === 'UPDATE') {
-            if (payload.new.status === 'RESOLVED') setActiveAndon(null);
-            else setActiveAndon(payload.new);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => { supabase.removeChannel(subscription); };
-  }, [machineId]);
-
-  const triggerAndon = async (type) => {
-    try {
-      // 1. Get machine name
-      const { data: mData } = await supabase.from('machines').select('name, company_id').eq('id', machineId).single();
-
-      // 2. Call Edge Function
-      const { data, error } = await supabase.functions.invoke('andon-trigger', {
-        body: {
-          machineId: machineId,
-          operatorId: currentUser.id,
-          operatorName: currentUser.full_name,
-          type: type,
-          sirketId: mData.company_id,
-          machineName: mData.name
-        }
-      });
-
-      if (error) throw error;
-
-    } catch (err) {
-      console.error('Andon Error:', err);
-      // Hata detayını yakala (Eğer Edge Function JSON döndürdüyse)
-      let message = err.message;
-      if (err.context && err.context.json) {
-        try {
-          const detail = await err.context.json();
-          if (detail.error) message = detail.error;
-        } catch (e) { /* ignore json parse error */ }
-      }
-      alert('Andon Hatası: ' + message);
-    }
-  };
-
-  const resolveAndon = async () => {
-    if (!activeAndon) return;
-    try {
-      await supabase.from('andon_loglari').update({ status: 'RESOLVED', resolved_at: new Date().toISOString() }).eq('id', activeAndon.id);
-      setActiveAndon(null);
-    } catch (err) {
-      alert('Kapatma hatası: ' + err.message);
-    }
   };
 
 
@@ -724,7 +760,6 @@ function MainAppPanel({ currentUser, onLogout, startProduction, stopProduction, 
           <h3 className="text-xl font-bold text-gray-900">{currentUser.full_name}</h3>
         </div>
         <div className="flex items-center gap-2">
-          {/* Machine ID hidden as per user request */}
           <button
             onClick={machineState === 'running' ? undefined : onLogout}
             disabled={machineState === 'running'}
@@ -780,29 +815,6 @@ function MainAppPanel({ currentUser, onLogout, startProduction, stopProduction, 
         )}
         <ActionButton text="Sorunsuz Parça Girdisi" onClick={() => setPartCountModalOpen(true)} icon={<Package size={40} />} colorClass="bg-gray-800 hover:bg-gray-900" />
       </div>
-
-      {/* FIXED ANDON BUTTONS (Bottom Right) */}
-      {!activeAndon && (
-        <div className="fixed bottom-6 right-6 flex flex-col gap-4 z-50">
-          <button
-            onClick={() => triggerAndon('MATERIAL')}
-            className="w-32 h-32 flex flex-col items-center justify-center bg-blue-600 text-white shadow-2xl rounded-2xl border-4 border-white hover:bg-blue-700 hover:scale-105 transition-all"
-          >
-            <Box size={40} className="mb-2" />
-            <span className="font-bold text-sm">MALZEME</span>
-            <span className="font-bold text-sm">İSTE</span>
-          </button>
-
-          <button
-            onClick={() => triggerAndon('MAINTENANCE')}
-            className="w-32 h-32 flex flex-col items-center justify-center bg-red-600 text-white shadow-2xl rounded-2xl border-4 border-white hover:bg-red-700 hover:scale-105 transition-all"
-          >
-            <Wrench size={40} className="mb-2" />
-            <span className="font-bold text-sm">BAKIMCI</span>
-            <span className="font-bold text-sm">ÇAĞIR</span>
-          </button>
-        </div>
-      )}
 
       {lastError && (
         <div className="absolute bottom-0 left-0 w-full bg-gray-50 rounded-b-2xl border-t border-gray-200 p-4 px-8 flex justify-between items-center transition-all">
