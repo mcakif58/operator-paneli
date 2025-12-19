@@ -1,7 +1,8 @@
 ﻿
 import React, { useState, useMemo, useEffect } from 'react';
-import { Database, User, Settings, AlertTriangle, Play, StopCircle, LogOut, CheckCircle, XCircle, Lock, Package, Pencil, Monitor, Cpu, ScanLine, KeyRound, Wrench, Box } from 'lucide-react';
+import { Database, User, Settings, AlertTriangle, Play, StopCircle, LogOut, CheckCircle, XCircle, Lock, Package, Pencil, Monitor, Cpu, ScanLine, KeyRound, Wrench, Box, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { supabase } from './supabase';
+import { NetworkManager } from './NetworkManager';
 import AdminPanel from './AdminPanel';
 
 // --- Ana Uygulama Bileşeni ---
@@ -26,6 +27,43 @@ export default function App() {
 
   // İYİLEŞTİRME: Makine durumunu (state) ana bileşene taşıdık.
   const [machineState, setMachineState] = useState('idle'); // 'idle', 'running', 'stopped'
+
+  // NEW: Network State
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  // -------------------------------------------------------------------------
+  // NETWORK LISTENER
+  // -------------------------------------------------------------------------
+  useEffect(() => {
+    const handleStatusChange = (status) => {
+      setIsSyncing(status === 'SYNCING');
+    };
+
+    const handleOnline = () => {
+      setIsOnline(true);
+      console.log('App: Online detected. Processing queue...');
+      NetworkManager.processQueue(handleStatusChange);
+    };
+
+    const handleOffline = () => {
+      setIsOnline(false);
+      console.log('App: Offline detected.');
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // Initial check
+    if (navigator.onLine) {
+      NetworkManager.processQueue(handleStatusChange);
+    }
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // -------------------------------------------------------------------------
   // 1. MAKİNE KİMLİĞİ BELİRLEME (Hybrid System)
@@ -239,9 +277,14 @@ export default function App() {
     };
 
     try {
-      const { error } = await supabase.from('sorunsuz_parca_loglari').insert([logData]);
-      if (error) throw error;
-      console.log('Parça sayısı kaydedildi:', count);
+      if (isOnline) {
+        const { error } = await supabase.from('sorunsuz_parca_loglari').insert([logData]);
+        if (error) throw error;
+        console.log('Parça sayısı kaydedildi:', count);
+      } else {
+        await NetworkManager.addToQueue('sorunsuz_parca_loglari', 'INSERT', logData);
+        alert('İnternet yok. Veri hafızaya alındı, bağlanınca gönderilecek.');
+      }
     } catch (error) {
       alert('Hata: ' + error.message);
     }
@@ -257,8 +300,13 @@ export default function App() {
     };
 
     try {
-      const { error } = await supabase.from('hata_loglari').insert([logData]);
-      if (error) throw error;
+      if (isOnline) {
+        const { error } = await supabase.from('hata_loglari').insert([logData]);
+        if (error) throw error;
+      } else {
+        await NetworkManager.addToQueue('hata_loglari', 'INSERT', logData);
+        alert('İnternet yok. Hata kaydı sıraya eklendi.');
+      }
     } catch (error) {
       alert('Hata: ' + error.message);
     }
@@ -275,8 +323,14 @@ export default function App() {
     };
 
     try {
-      const { data, error } = await supabase.from('durus_loglari').insert([logData]).select();
-      if (error) throw error;
+      if (isOnline) {
+        const { data, error } = await supabase.from('durus_loglari').insert([logData]).select();
+        if (error) throw error;
+      } else {
+        await NetworkManager.addToQueue('durus_loglari', 'INSERT', logData);
+        // Optimistic update handled by MainAppPanel state change, but here we just queue
+        console.log('Offline Start: Queued');
+      }
     } catch (error) {
       alert('Başlatma hatası: ' + error.message);
     }
@@ -284,34 +338,46 @@ export default function App() {
 
   const stopProduction = async (reason) => {
     try {
-      // SADECE BU MAKİNE VE BU OPERATÖR İÇİN AÇIK OTURUMU BUL
-      const { data: openSessions, error: fetchError } = await supabase
-        .from('durus_loglari')
-        .select('*')
-        .eq('operator_id', currentUser.id)
-        .eq('machine_id', machineId)
-        .is('bitis', null)
-        .order('baslangic', { ascending: false })
-        .limit(1);
+      if (isOnline) {
+        // SADECE BU MAKİNE VE BU OPERATÖR İÇİN AÇIK OTURUMU BUL
+        const { data: openSessions, error: fetchError } = await supabase
+          .from('durus_loglari')
+          .select('*')
+          .eq('operator_id', currentUser.id)
+          .eq('machine_id', machineId)
+          .is('bitis', null)
+          .order('baslangic', { ascending: false })
+          .limit(1);
 
-      if (fetchError) throw fetchError;
+        if (fetchError) throw fetchError;
 
-      if (!openSessions || openSessions.length === 0) {
-        alert('Şu anda açık bir üretim kaydı görünmüyor.');
-        return;
-      }
+        if (!openSessions || openSessions.length === 0) {
+          alert('Şu anda açık bir üretim kaydı görünmüyor.');
+          return;
+        }
 
-      const sessionToClose = openSessions[0];
+        const sessionToClose = openSessions[0];
 
-      const { error: updateError } = await supabase
-        .from('durus_loglari')
-        .update({
+        const { error: updateError } = await supabase
+          .from('durus_loglari')
+          .update({
+            bitis: new Date().toISOString(),
+            sebep: reason
+          })
+          .eq('id', sessionToClose.id);
+
+        if (updateError) throw updateError;
+      } else {
+        // OFFLINE STOP
+        const stopData = {
+          machine_id: machineId,
+          operator_id: currentUser.id,
           bitis: new Date().toISOString(),
           sebep: reason
-        })
-        .eq('id', sessionToClose.id);
-
-      if (updateError) throw updateError;
+        };
+        await NetworkManager.addToQueue('durus_loglari', 'STOP_PRODUCTION', stopData);
+        console.log('Offline Stop: Queued');
+      }
 
     } catch (error) {
       alert('Durdurma hatası: ' + error.message);
@@ -430,6 +496,9 @@ export default function App() {
             activeAndon={activeAndon}
             triggerAndon={triggerAndon}
             resolveAndon={resolveAndon}
+            // Pass Network Props
+            isOnline={isOnline}
+            isSyncing={isSyncing}
           />
         );
       case 'admin':
@@ -657,7 +726,9 @@ function MainAppPanel({
   currentUser, onLogout, startProduction, stopProduction, logError, logPartCount,
   machineState, setMachineState, stopReasons, errorReasons, machineId,
   // Props from App
-  activeAndon, triggerAndon, resolveAndon
+  activeAndon, triggerAndon, resolveAndon,
+  // Network Props
+  isOnline, isSyncing
 }) {
 
   const [isStopModalOpen, setStopModalOpen] = useState(false);
@@ -760,6 +831,16 @@ function MainAppPanel({
           <h3 className="text-xl font-bold text-gray-900">{currentUser.full_name}</h3>
         </div>
         <div className="flex items-center gap-2">
+          {!isOnline && (
+            <div className="flex items-center gap-1 bg-red-100 text-red-600 px-3 py-1 rounded-full text-sm font-bold animate-pulse">
+              <WifiOff size={18} /> OFFLINE
+            </div>
+          )}
+          {isOnline && isSyncing && (
+            <div className="flex items-center gap-1 bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-sm font-bold">
+              <RefreshCw size={18} className="animate-spin" /> EŞİTLENİYOR...
+            </div>
+          )}
           <button
             onClick={machineState === 'running' ? undefined : onLogout}
             disabled={machineState === 'running'}
