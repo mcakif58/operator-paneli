@@ -647,7 +647,16 @@ function MainAppPanel({ currentUser, onLogout, startProduction, stopProduction, 
       if (error) throw error;
 
     } catch (err) {
-      alert('Andon çağrısı başarısız: ' + err.message);
+      console.error('Andon Error:', err);
+      // Hata detayını yakala (Eğer Edge Function JSON döndürdüyse)
+      let message = err.message;
+      if (err.context && err.context.json) {
+        try {
+          const detail = await err.context.json();
+          if (detail.error) message = detail.error;
+        } catch (e) { /* ignore json parse error */ }
+      }
+      alert('Andon Hatası: ' + message);
     }
   };
 
