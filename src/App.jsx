@@ -781,23 +781,25 @@ function MainAppPanel({ currentUser, onLogout, startProduction, stopProduction, 
         <ActionButton text="Sorunsuz Parça Girdisi" onClick={() => setPartCountModalOpen(true)} icon={<Package size={40} />} colorClass="bg-gray-800 hover:bg-gray-900" />
       </div>
 
-      {/* INTEGRATED ANDON BUTTONS AT BOTTOM */}
+      {/* FIXED ANDON BUTTONS (Bottom Right) */}
       {!activeAndon && (
-        <div className="mt-8 grid grid-cols-2 gap-4 border-t pt-8 border-gray-100">
+        <div className="fixed bottom-6 right-6 flex flex-col gap-4 z-50">
           <button
-            onClick={() => triggerAndon('MAINTENANCE')}
-            className="h-24 flex flex-col items-center justify-center bg-red-50 text-red-600 border-2 border-red-100 hover:bg-red-100 hover:border-red-300 rounded-xl transition-all"
+            onClick={() => triggerAndon('MATERIAL')}
+            className="w-32 h-32 flex flex-col items-center justify-center bg-blue-600 text-white shadow-2xl rounded-2xl border-4 border-white hover:bg-blue-700 hover:scale-105 transition-all"
           >
-            <Wrench size={32} className="mb-2" />
-            <span className="font-bold">BAKIMCI ÇAĞIR</span>
+            <Box size={40} className="mb-2" />
+            <span className="font-bold text-sm">MALZEME</span>
+            <span className="font-bold text-sm">İSTE</span>
           </button>
 
           <button
-            onClick={() => triggerAndon('MATERIAL')}
-            className="h-24 flex flex-col items-center justify-center bg-blue-50 text-blue-600 border-2 border-blue-100 hover:bg-blue-100 hover:border-blue-300 rounded-xl transition-all"
+            onClick={() => triggerAndon('MAINTENANCE')}
+            className="w-32 h-32 flex flex-col items-center justify-center bg-red-600 text-white shadow-2xl rounded-2xl border-4 border-white hover:bg-red-700 hover:scale-105 transition-all"
           >
-            <Box size={32} className="mb-2" />
-            <span className="font-bold">MALZEME İSTE</span>
+            <Wrench size={40} className="mb-2" />
+            <span className="font-bold text-sm">BAKIMCI</span>
+            <span className="font-bold text-sm">ÇAĞIR</span>
           </button>
         </div>
       )}
