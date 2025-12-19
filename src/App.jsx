@@ -1,5 +1,5 @@
 ﻿import React, { useState, useMemo, useEffect } from 'react';
-import { Database, User, Settings, AlertTriangle, Play, StopCircle, LogOut, CheckCircle, XCircle, Lock, Package, Pencil, Monitor, Cpu, ScanLine, KeyRound } from 'lucide-react';
+import { Database, User, Settings, AlertTriangle, Play, StopCircle, LogOut, CheckCircle, XCircle, Lock, Package, Pencil, Monitor, Cpu, ScanLine, KeyRound, Wrench, Box } from 'lucide-react';
 import { supabase } from './supabase';
 import AdminPanel from './AdminPanel';
 
@@ -553,6 +553,9 @@ function MainAppPanel({ currentUser, onLogout, startProduction, stopProduction, 
   const [isCorrectionModalOpen, setCorrectionModalOpen] = useState(false);
   const [canEditError, setCanEditError] = useState(false);
 
+  // NEW: Andon State
+  const [activeAndon, setActiveAndon] = useState(null);
+
   // Son hatayı getir
   const fetchLastError = async () => {
     try {
@@ -589,6 +592,75 @@ function MainAppPanel({ currentUser, onLogout, startProduction, stopProduction, 
     const diffMinutes = (now - errorTime) / (1000 * 60);
     setCanEditError(diffMinutes <= 5);
   };
+
+  // ANDON: Fetch initial status and subscribe to realtime
+  useEffect(() => {
+    const fetchAndon = async () => {
+      const { data } = await supabase
+        .from('andon_loglari')
+        .select('*')
+        .eq('machine_id', machineId)
+        .neq('status', 'RESOLVED')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      if (data) setActiveAndon(data);
+    };
+    fetchAndon();
+
+    const subscription = supabase
+      .channel('andon_realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'andon_loglari', filter: `machine_id=eq.${machineId}` },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            if (payload.new.status !== 'RESOLVED') setActiveAndon(payload.new);
+          } else if (payload.eventType === 'UPDATE') {
+            if (payload.new.status === 'RESOLVED') setActiveAndon(null);
+            else setActiveAndon(payload.new);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(subscription); };
+  }, [machineId]);
+
+  const triggerAndon = async (type) => {
+    try {
+      // 1. Get machine name
+      const { data: mData } = await supabase.from('machines').select('name, company_id').eq('id', machineId).single();
+
+      // 2. Call Edge Function
+      const { data, error } = await supabase.functions.invoke('andon-trigger', {
+        body: {
+          machineId: machineId,
+          operatorId: currentUser.id,
+          operatorName: currentUser.full_name,
+          type: type,
+          sirketId: mData.company_id,
+          machineName: mData.name
+        }
+      });
+
+      if (error) throw error;
+
+    } catch (err) {
+      alert('Andon çağrısı başarısız: ' + err.message);
+    }
+  };
+
+  const resolveAndon = async () => {
+    if (!activeAndon) return;
+    try {
+      await supabase.from('andon_loglari').update({ status: 'RESOLVED', resolved_at: new Date().toISOString() }).eq('id', activeAndon.id);
+      setActiveAndon(null);
+    } catch (err) {
+      alert('Kapatma hatası: ' + err.message);
+    }
+  };
+
 
   const handleStart = () => { startProduction(); setMachineState('running'); };
   const handleStopClick = () => { setStopModalOpen(true); };
@@ -662,6 +734,31 @@ function MainAppPanel({ currentUser, onLogout, startProduction, stopProduction, 
         {statusConfig.icon} {statusConfig.text}
       </div>
 
+      {/* ANDON STATUS BAR */}
+      {activeAndon && (
+        <div className={`mb-8 p-4 rounded-xl border-2 flex justify-between items-center animate-pulse ${activeAndon.status === 'RESPONDING' ? 'bg-green-50 border-green-500 text-green-800' : 'bg-yellow-50 border-yellow-500 text-yellow-800'
+          }`}>
+          <div>
+            <div className="flex items-center gap-2 font-bold text-lg">
+              {activeAndon.type === 'MAINTENANCE' ? <Wrench size={24} /> : <Box size={24} />}
+              {activeAndon.type === 'MAINTENANCE' ? 'BAKIM' : 'MALZEME'} TALEBİ AKTİF
+            </div>
+            <div className="text-sm mt-1">
+              {activeAndon.status === 'RESPONDING'
+                ? `YARDIM GELİYOR: ${activeAndon.responder_name || 'Yetkili'}`
+                : 'YETKİLİ BEKLENİYOR...'}
+            </div>
+          </div>
+
+          <button
+            onClick={resolveAndon}
+            className="px-4 py-2 bg-white border border-gray-300 shadow-sm rounded-lg text-sm font-bold text-gray-700 hover:bg-gray-50"
+          >
+            Sorun Giderildi
+          </button>
+        </div>
+      )}
+
       <div className="space-y-6">
         {(machineState === 'idle' || machineState === 'stopped') && (
           <ActionButton text="Üretimi Başlat" onClick={handleStart} icon={<Play size={40} />} colorClass="bg-green-600 hover:bg-green-700" />
@@ -674,6 +771,27 @@ function MainAppPanel({ currentUser, onLogout, startProduction, stopProduction, 
         )}
         <ActionButton text="Sorunsuz Parça Girdisi" onClick={() => setPartCountModalOpen(true)} icon={<Package size={40} />} colorClass="bg-gray-800 hover:bg-gray-900" />
       </div>
+
+      {/* INTEGRATED ANDON BUTTONS AT BOTTOM */}
+      {!activeAndon && (
+        <div className="mt-8 grid grid-cols-2 gap-4 border-t pt-8 border-gray-100">
+          <button
+            onClick={() => triggerAndon('MAINTENANCE')}
+            className="h-24 flex flex-col items-center justify-center bg-red-50 text-red-600 border-2 border-red-100 hover:bg-red-100 hover:border-red-300 rounded-xl transition-all"
+          >
+            <Wrench size={32} className="mb-2" />
+            <span className="font-bold">BAKIMCI ÇAĞIR</span>
+          </button>
+
+          <button
+            onClick={() => triggerAndon('MATERIAL')}
+            className="h-24 flex flex-col items-center justify-center bg-blue-50 text-blue-600 border-2 border-blue-100 hover:bg-blue-100 hover:border-blue-300 rounded-xl transition-all"
+          >
+            <Box size={32} className="mb-2" />
+            <span className="font-bold">MALZEME İSTE</span>
+          </button>
+        </div>
+      )}
 
       {lastError && (
         <div className="absolute bottom-0 left-0 w-full bg-gray-50 rounded-b-2xl border-t border-gray-200 p-4 px-8 flex justify-between items-center transition-all">
