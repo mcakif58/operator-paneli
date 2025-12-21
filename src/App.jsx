@@ -548,7 +548,7 @@ export default function App() {
         <div className="fixed bottom-6 right-6 flex flex-col gap-4 z-[9999]">
           <button
             onClick={() => triggerAndon('MATERIAL')}
-            className="w-32 h-32 flex flex-col items-center justify-center bg-[#0D47A1] text-white shadow-2xl rounded-2xl border-4 border-white hover:opacity-90 hover:scale-105 transition-all transform hover:-translate-y-1"
+            className="w-32 h-32 flex flex-col items-center justify-center bg-[#0D47A1] text-white shadow-2xl rounded-2xl border-4 border-white hover:bg-[#00296B] hover:scale-105 transition-all transform hover:-translate-y-1"
           >
             <Box size={40} className="mb-2" />
             <span className="font-bold text-sm">MALZEME</span>
@@ -557,7 +557,7 @@ export default function App() {
 
           <button
             onClick={() => triggerAndon('MAINTENANCE')}
-            className="w-32 h-32 flex flex-col items-center justify-center bg-[#C62828] text-white shadow-2xl rounded-2xl border-4 border-white hover:opacity-90 hover:scale-105 transition-all transform hover:-translate-y-1"
+            className="w-32 h-32 flex flex-col items-center justify-center bg-[#C62828] text-white shadow-2xl rounded-2xl border-4 border-white hover:bg-[#9C1B1B] hover:scale-105 transition-all transform hover:-translate-y-1"
           >
             <Wrench size={40} className="mb-2" />
             <span className="font-bold text-sm">BAKIMCI</span>
